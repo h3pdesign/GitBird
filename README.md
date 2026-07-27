@@ -18,6 +18,10 @@ A native macOS menu bar app for keeping GitHub and GitLab notifications close at
 - Native macOS menu bar experience with Liquid Glass styling on supported systems.
 - Swift 6 and complete strict-concurrency checking.
 
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.0](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.0).
+
 ## Requirements
 
 - macOS 14.6 or later.
