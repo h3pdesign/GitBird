@@ -92,7 +92,7 @@ struct ContentView: View {
     private var headerControlButtons: some View {
         HStack(spacing: 8) {
             Button {
-                runtimeData.renewPullTask(interval: runtimeData.interval)
+                runtimeData.refreshNotifications()
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .symbolRenderingMode(.hierarchical)
@@ -101,6 +101,7 @@ struct ContentView: View {
             }
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
+            .disabled(runtimeData.isRefreshing)
             .help("Refresh")
 
             Button {
@@ -240,6 +241,9 @@ struct ContentView: View {
                                     onOpen: { thread, url in
                                         closeMenuWindowIfPossible()
                                         openURL(runtimeData.urlForOpeningNotificationDetail(threadId: thread.id, baseURL: url))
+                                    },
+                                    onMarkAsDone: { thread in
+                                        runtimeData.markNotificationAsDone(threadId: thread.id)
                                     },
                                     onMarkAsRead: { thread in
                                         runtimeData.markNotificationAsRead(threadId: thread.id)

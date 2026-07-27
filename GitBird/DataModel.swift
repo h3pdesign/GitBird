@@ -272,6 +272,19 @@ struct GitHubAPIClient {
         }
     }
 
+    func markThreadAsDone(url: URL) async throws {
+        var request = makeRequest(url: url)
+        request.httpMethod = "DELETE"
+        let (data, response) = try await Self.session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200...299).contains(http.statusCode) else {
+            let body = String(decoding: data, as: UTF8.self)
+            throw APIError.httpError(statusCode: http.statusCode, body: body)
+        }
+    }
+
     func markAllNotificationsAsRead(lastReadAt: Date?) async throws {
         struct RequestBody: Encodable {
             let read: Bool
@@ -352,6 +365,7 @@ struct GitHubAPIClient {
 
     @Published private(set) var isLoadingMoreNotifications: Bool = false
     @Published private(set) var hasMoreNotifications: Bool = false
+    @Published private(set) var isRefreshing: Bool = false
     @Published private(set) var loadMoreError: String = ""
     @Published private(set) var isMarkingAllNotificationsAsRead: Bool = false
 
@@ -438,6 +452,56 @@ struct GitHubAPIClient {
         renewPullTask(interval: interval)
     }
     
+    func refreshNotifications() {
+        guard !githubToken.isEmpty else {
+            message = "Set GitHub token in settings first!"
+            return
+        }
+
+        pullTask?.cancel()
+        detailsTask?.cancel()
+        loadMoreTask?.cancel()
+        pullTask = nil
+        detailsTask = nil
+        loadMoreTask = nil
+        resetPaginationState()
+
+        let token = githubToken
+        let perPage = notificationsPerPage
+        isRefreshing = true
+        message = ""
+
+        pullTask = Task.detached(priority: .userInitiated) { [weak self, token, perPage] in
+            let (firstPage, ok, hasNext, err) = await fetchNotificationThreads(
+                githubToken: token,
+                page: 1,
+                perPage: perPage
+            )
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard let self else { return }
+                if ok {
+                    self.notifications = firstPage
+                    self.lastPull = Date()
+                }
+                self.message = err
+                self.nextNotificationsPage = ok && hasNext ? 2 : nil
+                self.hasMoreNotifications = ok && hasNext
+                self.isLoadingMoreNotifications = false
+                self.loadMoreError = ""
+                self.isRefreshing = false
+
+                let ids = Set(self.notifications.map(\.id))
+                self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { details in ids.contains(details.key) }
+                if ok {
+                    self.prefetchSubjectDetails(for: firstPage)
+                }
+            }
+        }
+    }
+
     func renewPullTask(interval: Int) {
         AppLog.info("Renew pull task (interval=\(interval)s)")
         pullTask?.cancel()
@@ -631,6 +695,25 @@ struct GitHubAPIClient {
                 AppLog.warning("Failed to mark notification as read: \(error)")
                 await MainActor.run {
                     self?.message = "Failed to mark as read"
+                }
+            }
+        }
+    }
+
+    func markNotificationAsDone(threadId: String) {
+        guard let thread = notifications.first(where: { candidate in candidate.id == threadId }) else { return }
+        let api = GitHubAPIClient(token: githubToken)
+        Task.detached(priority: .utility) { [weak self] in
+            do {
+                try await api.markThreadAsDone(url: thread.url)
+                await MainActor.run {
+                    self?.notifications.removeAll { candidate in candidate.id == threadId }
+                    self?.subjectDetailsByThreadId.removeValue(forKey: threadId)
+                }
+            } catch {
+                AppLog.warning("Failed to mark notification as done: \(error)")
+                await MainActor.run {
+                    self?.message = "Failed to mark as done"
                 }
             }
         }

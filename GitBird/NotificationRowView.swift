@@ -5,6 +5,7 @@ struct NotificationRowView: View {
     let thread: GitHubNotificationThread
     let details: GitHubSubjectDetails?
     let onOpen: (GitHubNotificationThread, URL) -> Void
+    let onMarkAsDone: (GitHubNotificationThread) -> Void
     let onMarkAsRead: (GitHubNotificationThread) -> Void
 
     @State private var isHovering = false
@@ -97,9 +98,9 @@ struct NotificationRowView: View {
         .focusable()
         .onDeleteCommand {
             guard thread.unread else { return }
-            onMarkAsRead(thread)
+            onMarkAsDone(thread)
         }
-        .help("Open notification. Press Delete to mark as read.")
+        .help("Open notification. Press Delete to mark as done.")
         .background(HoverTrackingView(isHovering: $isHovering))
         .animation(.easeOut(duration: 0.12), value: isHovering)
     }
