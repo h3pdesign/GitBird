@@ -1,4 +1,4 @@
-# GitStatus
+# GitBird
 
 Show GitHub notifications on menubar.
 

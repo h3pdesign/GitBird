@@ -3,11 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 100;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		542612652ACFB17E00682CA7 /* GitStatusApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542612642ACFB17E00682CA7 /* GitStatusApp.swift */; };
+		542612652ACFB17E00682CA7 /* GitBirdApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542612642ACFB17E00682CA7 /* GitBirdApp.swift */; };
 		542612672ACFB17E00682CA7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542612662ACFB17E00682CA7 /* ContentView.swift */; };
 		542612692ACFB17F00682CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 542612682ACFB17F00682CA7 /* Assets.xcassets */; };
 		5426126C2ACFB17F00682CA7 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5426126B2ACFB17F00682CA7 /* Preview Assets.xcassets */; };
@@ -16,30 +16,31 @@
 		54A0D0032D0F000100000001 /* NotificationRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0022D0F000100000001 /* NotificationRowView.swift */; };
 		54A0D0072D0F000100000001 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0062D0F000100000001 /* VisualEffectView.swift */; };
 		54A0D00A2D0F000100000001 /* AppLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0082D0F000100000001 /* AppLog.swift */; };
+		54A0D00C2D0F000100000001 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 54A0D00B2D0F000100000001 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		542612612ACFB17E00682CA7 /* GitStatus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GitStatus.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		542612642ACFB17E00682CA7 /* GitStatusApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitStatusApp.swift; sourceTree = "<group>"; };
+		542612612ACFB17E00682CA7 /* GitBird.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GitBird.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		542612642ACFB17E00682CA7 /* GitBirdApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitBirdApp.swift; sourceTree = "<group>"; };
 		542612662ACFB17E00682CA7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		542612682ACFB17F00682CA7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5426126B2ACFB17F00682CA7 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		5426126D2ACFB17F00682CA7 /* GitStatus.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GitStatus.entitlements; sourceTree = "<group>"; };
+		5426126D2ACFB17F00682CA7 /* GitBird.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GitBird.entitlements; sourceTree = "<group>"; };
 		542612732ACFD8FD00682CA7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		542612772ACFE27300682CA7 /* SettingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingView.swift; sourceTree = "<group>"; };
 		5426127B2AD0088E00682CA7 /* DataModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataModel.swift; sourceTree = "<group>"; };
 		54A0D0022D0F000100000001 /* NotificationRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationRowView.swift; sourceTree = "<group>"; };
 		54A0D0062D0F000100000001 /* VisualEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectView.swift; sourceTree = "<group>"; };
 		54A0D0082D0F000100000001 /* AppLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLog.swift; sourceTree = "<group>"; };
+		54A0D00B2D0F000100000001 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		5426125E2ACFB17E00682CA7 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
+				54A0D00C2D0F000100000001 /* AppIcon.icon in Resources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -47,7 +48,7 @@
 		542612582ACFB17E00682CA7 = {
 			isa = PBXGroup;
 			children = (
-				542612632ACFB17E00682CA7 /* GitStatus */,
+				542612632ACFB17E00682CA7 /* GitBird */,
 				542612622ACFB17E00682CA7 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -55,27 +56,28 @@
 		542612622ACFB17E00682CA7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				542612612ACFB17E00682CA7 /* GitStatus.app */,
+				542612612ACFB17E00682CA7 /* GitBird.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		542612632ACFB17E00682CA7 /* GitStatus */ = {
+		542612632ACFB17E00682CA7 /* GitBird */ = {
 			isa = PBXGroup;
 			children = (
 				542612732ACFD8FD00682CA7 /* Info.plist */,
-				542612642ACFB17E00682CA7 /* GitStatusApp.swift */,
+				542612642ACFB17E00682CA7 /* GitBirdApp.swift */,
 				54A0D0082D0F000100000001 /* AppLog.swift */,
 				542612662ACFB17E00682CA7 /* ContentView.swift */,
 				54A0D0022D0F000100000001 /* NotificationRowView.swift */,
 				54A0D0062D0F000100000001 /* VisualEffectView.swift */,
+				54A0D00B2D0F000100000001 /* AppIcon.icon */,
 				542612682ACFB17F00682CA7 /* Assets.xcassets */,
-				5426126D2ACFB17F00682CA7 /* GitStatus.entitlements */,
+				5426126D2ACFB17F00682CA7 /* GitBird.entitlements */,
 				5426126A2ACFB17F00682CA7 /* Preview Content */,
 				542612772ACFE27300682CA7 /* SettingView.swift */,
 				5426127B2AD0088E00682CA7 /* DataModel.swift */,
 			);
-			path = GitStatus;
+			path = GitBird;
 			sourceTree = "<group>";
 		};
 		5426126A2ACFB17F00682CA7 /* Preview Content */ = {
@@ -89,9 +91,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		542612602ACFB17E00682CA7 /* GitStatus */ = {
+		542612602ACFB17E00682CA7 /* GitBird */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 542612702ACFB17F00682CA7 /* Build configuration list for PBXNativeTarget "GitStatus" */;
+			buildConfigurationList = 542612702ACFB17F00682CA7 /* Build configuration list for PBXNativeTarget "GitBird" */;
 			buildPhases = (
 				5426125D2ACFB17E00682CA7 /* Sources */,
 				5426125E2ACFB17E00682CA7 /* Frameworks */,
@@ -99,11 +101,9 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
-			name = GitStatus;
-			productName = GitStatus;
-			productReference = 542612612ACFB17E00682CA7 /* GitStatus.app */;
+			name = GitBird;
+			productName = GitBird;
+			productReference = 542612612ACFB17E00682CA7 /* GitBird.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -121,8 +121,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 5426125C2ACFB17E00682CA7 /* Build configuration list for PBXProject "GitStatus" */;
-			compatibilityVersion = "Xcode 14.0";
+			buildConfigurationList = 5426125C2ACFB17E00682CA7 /* Build configuration list for PBXProject "GitBird" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -130,11 +129,12 @@
 				Base,
 			);
 			mainGroup = 542612582ACFB17E00682CA7;
+			preferredProjectObjectVersion = 100;
 			productRefGroup = 542612622ACFB17E00682CA7 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				542612602ACFB17E00682CA7 /* GitStatus */,
+				542612602ACFB17E00682CA7 /* GitBird */,
 			);
 		};
 /* End PBXProject section */
@@ -142,19 +142,16 @@
 /* Begin PBXResourcesBuildPhase section */
 		5426125F2ACFB17E00682CA7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				5426126C2ACFB17F00682CA7 /* Preview Assets.xcassets in Resources */,
 				542612692ACFB17F00682CA7 /* Assets.xcassets in Resources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		5426125D2ACFB17E00682CA7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				5426127C2AD0088E00682CA7 /* DataModel.swift in Sources */,
 				54A0D00A2D0F000100000001 /* AppLog.swift in Sources */,
@@ -162,14 +159,13 @@
 				54A0D0032D0F000100000001 /* NotificationRowView.swift in Sources */,
 				54A0D0072D0F000100000001 /* VisualEffectView.swift in Sources */,
 				542612782ACFE27300682CA7 /* SettingView.swift in Sources */,
-				542612652ACFB17E00682CA7 /* GitStatusApp.swift in Sources */,
+				542612652ACFB17E00682CA7 /* GitBirdApp.swift in Sources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		5426126E2ACFB17F00682CA7 /* Debug */ = {
+		5426126E2ACFB17F00682CA7 /* Debug configuration for PBXProject "GitBird" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -235,7 +231,7 @@
 			};
 			name = Debug;
 		};
-		5426126F2ACFB17F00682CA7 /* Release */ = {
+		5426126F2ACFB17F00682CA7 /* Release configuration for PBXProject "GitBird" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -293,70 +289,76 @@
 			};
 			name = Release;
 		};
-		542612712ACFB17F00682CA7 /* Debug */ = {
+		542612712ACFB17F00682CA7 /* Debug configuration for PBXNativeTarget "GitBird" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = GitStatus/GitStatus.entitlements;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				CODE_SIGN_ENTITLEMENTS = GitBird/GitBird.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 179;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_ASSET_PATHS = "\"GitStatus/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"GitBird/Preview Content\"";
+				DEVELOPMENT_TEAM = CS727NF72U;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = GitStatus/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = GitStatus;
+				INFOPLIST_FILE = GitBird/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GitBird;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_LSUIElement = YES;
+				ICON_FILE = AppIcon.icon;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rook1e.GitStatus;
+				MARKETING_VERSION = 2.0.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitStatus;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
-		542612722ACFB17F00682CA7 /* Release */ = {
+		542612722ACFB17F00682CA7 /* Release configuration for PBXNativeTarget "GitBird" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = GitStatus/GitStatus.entitlements;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				CODE_SIGN_ENTITLEMENTS = GitBird/GitBird.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 179;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_ASSET_PATHS = "\"GitStatus/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"GitBird/Preview Content\"";
+				DEVELOPMENT_TEAM = CS727NF72U;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = GitStatus/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = GitStatus;
+				INFOPLIST_FILE = GitBird/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GitBird;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_LSUIElement = YES;
+				ICON_FILE = AppIcon.icon;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rook1e.GitStatus;
+				MARKETING_VERSION = 2.0.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitStatus;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -366,22 +368,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		5426125C2ACFB17E00682CA7 /* Build configuration list for PBXProject "GitStatus" */ = {
+		5426125C2ACFB17E00682CA7 /* Build configuration list for PBXProject "GitBird" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				5426126E2ACFB17F00682CA7 /* Debug */,
-				5426126F2ACFB17F00682CA7 /* Release */,
+				5426126E2ACFB17F00682CA7 /* Debug configuration for PBXProject "GitBird" */,
+				5426126F2ACFB17F00682CA7 /* Release configuration for PBXProject "GitBird" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		542612702ACFB17F00682CA7 /* Build configuration list for PBXNativeTarget "GitStatus" */ = {
+		542612702ACFB17F00682CA7 /* Build configuration list for PBXNativeTarget "GitBird" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				542612712ACFB17F00682CA7 /* Debug */,
-				542612722ACFB17F00682CA7 /* Release */,
+				542612712ACFB17F00682CA7 /* Debug configuration for PBXNativeTarget "GitBird" */,
+				542612722ACFB17F00682CA7 /* Release configuration for PBXNativeTarget "GitBird" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */

@@ -1,6 +1,6 @@
 //
-//  GitStatusApp.swift
-//  GitStatus
+//  GitBirdApp.swift
+//  GitBird
 //
 //  Created by rook1e on 2023/10/6.
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct GitStatusApp: App {
+struct GitBirdApp: App {
     init() {
         AppLog.bootstrap()
         AppLog.info("App launch")

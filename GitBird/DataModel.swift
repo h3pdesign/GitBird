@@ -1,6 +1,6 @@
 //
 //  DataModel.swift
-//  GitStatus
+//  GitBird
 //
 //  Created by rook1e on 2023/10/6.
 //
@@ -259,6 +259,52 @@ struct GitHubAPIClient {
         return (threads, hasNext)
     }
 
+    func markThreadAsRead(url: URL) async throws {
+        var request = makeRequest(url: url)
+        request.httpMethod = "PATCH"
+        let (data, response) = try await Self.session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200...299).contains(http.statusCode) else {
+            let body = String(decoding: data, as: UTF8.self)
+            throw APIError.httpError(statusCode: http.statusCode, body: body)
+        }
+    }
+
+    func markAllNotificationsAsRead(lastReadAt: Date?) async throws {
+        struct RequestBody: Encodable {
+            let read: Bool
+            let lastReadAt: String?
+
+            enum CodingKeys: String, CodingKey {
+                case read
+                case lastReadAt = "last_read_at"
+            }
+        }
+
+        var request = makeRequest(url: URL(string: "https://api.github.com/notifications")!)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(
+            RequestBody(
+                read: true,
+                lastReadAt: lastReadAt.map {
+                    Date.ISO8601FormatStyle(includingFractionalSeconds: false).format($0)
+                }
+            )
+        )
+
+        let (data, response) = try await Self.session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200...299).contains(http.statusCode) else {
+            let body = String(decoding: data, as: UTF8.self)
+            throw APIError.httpError(statusCode: http.statusCode, body: body)
+        }
+    }
+
     func fetchSubjectDetails(subjectURL: URL) async -> GitHubSubjectDetails? {
         struct SubjectResource: Codable {
             let htmlUrl: URL?
@@ -307,6 +353,7 @@ struct GitHubAPIClient {
     @Published private(set) var isLoadingMoreNotifications: Bool = false
     @Published private(set) var hasMoreNotifications: Bool = false
     @Published private(set) var loadMoreError: String = ""
+    @Published private(set) var isMarkingAllNotificationsAsRead: Bool = false
 
     @Published var listLength: Int = 10 {
         willSet(newValue) {
@@ -434,7 +481,9 @@ struct GitHubAPIClient {
                 await MainActor.run {
                     self.notifications = firstPage
                     self.message = err
-                    self.lastPull = Date()
+                    if ok {
+                        self.lastPull = Date()
+                    }
 
                     self.nextNotificationsPage = hasNext ? 2 : nil
                     self.hasMoreNotifications = self.nextNotificationsPage != nil
@@ -563,6 +612,56 @@ struct GitHubAPIClient {
                             return (nextId, details)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    func markNotificationAsRead(threadId: String) {
+        guard let thread = notifications.first(where: { $0.id == threadId }) else { return }
+        let api = GitHubAPIClient(token: githubToken)
+        Task.detached(priority: .utility) { [weak self] in
+            do {
+                try await api.markThreadAsRead(url: thread.url)
+                await MainActor.run {
+                    self?.notifications.removeAll { $0.id == threadId }
+                    self?.subjectDetailsByThreadId.removeValue(forKey: threadId)
+                }
+            } catch {
+                AppLog.warning("Failed to mark notification as read: \(error)")
+                await MainActor.run {
+                    self?.message = "Failed to mark as read"
+                }
+            }
+        }
+    }
+
+    func markAllNotificationsAsRead() {
+        guard !notifications.isEmpty else { return }
+        guard !isMarkingAllNotificationsAsRead else { return }
+        guard !githubToken.isEmpty else { return }
+
+        let targetIDs = Set(notifications.map(\.id))
+        let api = GitHubAPIClient(token: githubToken)
+        let lastReadAt = lastPull
+        isMarkingAllNotificationsAsRead = true
+
+        Task.detached(priority: .utility) { [weak self] in
+            do {
+                try await api.markAllNotificationsAsRead(lastReadAt: lastReadAt)
+                await MainActor.run {
+                    guard let self else { return }
+                    self.notifications.removeAll { targetIDs.contains($0.id) }
+                    self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { !targetIDs.contains($0.key) }
+                    self.nextNotificationsPage = nil
+                    self.hasMoreNotifications = false
+                    self.isMarkingAllNotificationsAsRead = false
+                }
+            } catch {
+                AppLog.warning("Failed to mark all notifications as read: \(error)")
+                await MainActor.run {
+                    self?.isMarkingAllNotificationsAsRead = false
+                    self?.message = "Failed to mark all as read"
                 }
             }
         }

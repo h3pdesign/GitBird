@@ -1,6 +1,6 @@
 //
 //  SettingView.swift
-//  GitStatus
+//  GitBird
 //
 
 import AppKit
@@ -95,7 +95,7 @@ struct SettingView: View {
             SettingsAppIconView(size: 28, cornerRadius: 6)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("GitStatus")
+                Text("GitBird")
                     .font(.headline)
                 Text(versionString)
                     .font(.caption)
@@ -225,7 +225,7 @@ private struct TokenSettingsView: View {
                 } header: {
                     Text("Access Token")
                 } footer: {
-                    Text("Only the Notifications permission is required.")
+                    Text("Only the Notifications permission is required. Mark all as read requires a classic personal access token.")
                 }
 
                 Section("Help") {
@@ -247,7 +247,7 @@ private struct AboutSettingsView: View {
                 SettingsAppIconView(size: 56, cornerRadius: 12)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("GitStatus")
+                    Text("GitBird")
                         .font(.title2)
                     Text(versionString)
                         .foregroundStyle(.secondary)

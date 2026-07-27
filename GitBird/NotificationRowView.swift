@@ -5,6 +5,7 @@ struct NotificationRowView: View {
     let thread: GitHubNotificationThread
     let details: GitHubSubjectDetails?
     let onOpen: (GitHubNotificationThread, URL) -> Void
+    let onMarkAsRead: (GitHubNotificationThread) -> Void
 
     @State private var isHovering = false
 
@@ -21,7 +22,14 @@ struct NotificationRowView: View {
                         Image(systemName: subjectTypeIconName(thread.subject.type))
                             .symbolRenderingMode(.hierarchical)
                             .frame(width: 18)
-                            .foregroundStyle(thread.unread ? .primary : .secondary)
+                            .foregroundStyle(subjectTypeColor)
+                    }
+
+                    if thread.unread {
+                        Circle()
+                            .fill(.blue)
+                            .frame(width: 6, height: 6)
+                            .accessibilityHidden(true)
                     }
 
                     Text(thread.repository.fullName)
@@ -29,6 +37,23 @@ struct NotificationRowView: View {
                         .foregroundStyle(.secondary)
 
                     Spacer(minLength: 8)
+
+                    if isHovering {
+                        Button {
+                            onMarkAsRead(thread)
+                        } label: {
+                            Image(systemName: "checkmark.circle.fill")
+                                .symbolRenderingMode(.hierarchical)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.green)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Mark as read")
+                        .help("Mark as read")
+                        .frame(width: 24, height: 24)
+                        .padding(.trailing, 2)
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    }
 
                     Text(thread.updatedAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption)
@@ -41,6 +66,15 @@ struct NotificationRowView: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if let reasonBadge {
+                    Label(reasonBadge.title, systemImage: reasonBadge.symbolName)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(reasonBadge.color)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(reasonBadge.color.opacity(0.16), in: Capsule())
+                }
+
                 if !participants.isEmpty {
                     AvatarStackView(users: participants)
                 }
@@ -51,9 +85,8 @@ struct NotificationRowView: View {
             .contentShape(Rectangle())
             .background {
                 if isHovering {
-                    VisualEffectView(material: .selection, blendingMode: .withinWindow)
-                        .clipShape(.rect(cornerRadius: 8, style: .continuous))
-                        .opacity(0.55)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(.primary.opacity(0.08))
                         .transition(.opacity)
                         .allowsHitTesting(false)
                 }
@@ -61,6 +94,12 @@ struct NotificationRowView: View {
         }
         .buttonStyle(.plain)
         .disabled(url == nil)
+        .focusable()
+        .onDeleteCommand {
+            guard thread.unread else { return }
+            onMarkAsRead(thread)
+        }
+        .help("Open notification. Press Delete to mark as read.")
         .background(HoverTrackingView(isHovering: $isHovering))
         .animation(.easeOut(duration: 0.12), value: isHovering)
     }
@@ -94,6 +133,52 @@ struct NotificationRowView: View {
         default:
             return "bell"
         }
+    }
+
+    private var subjectTypeColor: Color {
+        guard thread.unread else { return .secondary }
+
+        switch thread.subject.type {
+        case "PullRequest":
+            return .purple
+        case "Issue":
+            return .orange
+        case "Commit":
+            return .blue
+        case "Release":
+            return .pink
+        case "Discussion":
+            return .indigo
+        case "CheckSuite":
+            return .green
+        case "RepositoryInvitation":
+            return .cyan
+        default:
+            return .primary
+        }
+    }
+
+    private var reasonBadge: ReasonBadge? {
+        switch thread.reason {
+        case "review_requested":
+            return ReasonBadge(title: "Review requested", symbolName: "eye", color: .purple)
+        case "mention", "team_mention":
+            return ReasonBadge(title: "Mentioned", symbolName: "at", color: .blue)
+        case "assign":
+            return ReasonBadge(title: "Assigned", symbolName: "person.crop.circle.badge.checkmark", color: .orange)
+        case "approval_requested":
+            return ReasonBadge(title: "Approval requested", symbolName: "checkmark.seal", color: .indigo)
+        case "security_alert":
+            return ReasonBadge(title: "Security alert", symbolName: "exclamationmark.shield", color: .red)
+        default:
+            return nil
+        }
+    }
+
+    private struct ReasonBadge {
+        let title: String
+        let symbolName: String
+        let color: Color
     }
 }
 
@@ -147,20 +232,24 @@ private struct HoverTrackingView: NSViewRepresentable {
     func makeNSView(context: Context) -> TrackingNSView {
         let view = TrackingNSView()
         view.onHoverChanged = { hovering in
-            if isHovering != hovering {
-                isHovering = hovering
-            }
+            scheduleHoverStateUpdate(hovering)
         }
         return view
     }
 
     func updateNSView(_ nsView: TrackingNSView, context: Context) {
         nsView.onHoverChanged = { hovering in
-            if isHovering != hovering {
-                isHovering = hovering
-            }
+            scheduleHoverStateUpdate(hovering)
         }
         nsView.updateHoverState()
+    }
+
+    private func scheduleHoverStateUpdate(_ hovering: Bool) {
+        Task { @MainActor in
+            await Task.yield()
+            guard isHovering != hovering else { return }
+            isHovering = hovering
+        }
     }
 
     final class TrackingNSView: NSView {
