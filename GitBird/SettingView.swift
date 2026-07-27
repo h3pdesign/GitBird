@@ -259,67 +259,99 @@ private struct TokenSettingsView: View {
 }
 
 private struct AboutSettingsView: View {
+    private let repositoryURL = URL(string: "https://github.com/h3pdesign/GitBird")!
+    private let releasesURL = URL(string: "https://github.com/h3pdesign/GitBird/releases")!
+    private let issuesURL = URL(string: "https://github.com/h3pdesign/GitBird/issues")!
+    private let originalProjectURL = URL(string: "https://github.com/0x2E/GitStatus")!
+    private let iconParkURL = URL(string: "https://github.com/bytedance/IconPark")!
+    private let lucideURL = URL(string: "https://lucide.dev/icons/git-branch")!
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                SettingsAppIconView(size: 56, cornerRadius: 12)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                appSummary
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("GitBird")
-                        .font(.title2)
-                    Text(versionString)
-                        .foregroundStyle(.secondary)
-                }
-            }
+                Form {
+                    Section("GitBird") {
+                        LabeledContent("Version", value: versionString)
+                        LabeledContent("Platform", value: "macOS 14.6+")
+                        LabeledContent("Providers", value: "GitHub · GitLab")
+                    }
 
-            Text("A lightweight menu bar app for GitHub and GitLab notifications.")
-                .foregroundStyle(.secondary)
-
-            Divider()
-
-            Form {
-                Section("Links") {
-                    Link("GitHub repository", destination: URL(string: "https://github.com/h3pdesign/GitBird")!)
-                    Link("Report an issue", destination: URL(string: "https://github.com/h3pdesign/GitBird/issues")!)
-                }
-
-                Section {
-                    LabeledContent("Logs") {
-                        HStack(spacing: 10) {
-                            Button("Show in Finder") {
-                                AppLog.revealLogFileInFinder()
-                            }
-                            Button("Copy path") {
-                                AppLog.copyLogFilePathToPasteboard()
-                            }
+                    Section("Links") {
+                        Link(destination: repositoryURL) {
+                            Label("GitBird repository", systemImage: "chevron.left.forwardslash.chevron.right")
+                        }
+                        Link(destination: releasesURL) {
+                            Label("Releases", systemImage: "shippingbox")
+                        }
+                        Link(destination: issuesURL) {
+                            Label("Report an issue", systemImage: "exclamationmark.bubble")
+                        }
+                        Link(destination: originalProjectURL) {
+                            Label("Original GitStatus project", systemImage: "arrow.up.right.square")
                         }
                     }
 
-                    Text(AppLog.logFileURL.path)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .monospaced()
-                        .textSelection(.enabled)
-                } header: {
-                    Text("Diagnostics")
-                } footer: {
-                    Text("When reporting an issue, attach the log file if possible.")
-                }
-            }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
+                    Section("Credits") {
+                        Link(destination: iconParkURL) {
+                            Label("App artwork · IconPark", systemImage: "paintpalette")
+                        }
+                        Link(destination: lucideURL) {
+                            Label("Menu bar icon · Lucide", systemImage: "branch")
+                        }
+                    }
 
-            Spacer()
+                    Section {
+                        LabeledContent("Log file") {
+                            HStack(spacing: 10) {
+                                Button("Show in Finder") {
+                                    AppLog.revealLogFileInFinder()
+                                }
+                                Button("Copy path") {
+                                    AppLog.copyLogFilePathToPasteboard()
+                                }
+                            }
+                        }
+
+                        Text(AppLog.logFileURL.path)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .monospaced()
+                            .textSelection(.enabled)
+                    } header: {
+                        Text("Diagnostics")
+                    } footer: {
+                        Text("Attach this log file when reporting a problem. It contains app diagnostics, not your access token.")
+                    }
+                }
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
+            }
+            .padding(20)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
         .navigationTitle("About")
+    }
+
+    private var appSummary: some View {
+        HStack(alignment: .center, spacing: 14) {
+            SettingsAppIconView(size: 64, cornerRadius: 14)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("GitBird")
+                    .font(.title2.weight(.semibold))
+                Text("GitHub and GitLab notifications in your menu bar.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private var versionString: String {
         AppVersion.formatted(versionPrefix: "Version ", buildPrefix: "Build ")
     }
 }
+
 
 private struct SettingsAppIconView: View {
     let size: CGFloat
