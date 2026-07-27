@@ -45,6 +45,30 @@ struct NotificationRowView: View {
 
                     if isHovering {
                         Button {
+                            onMarkAsDone(thread)
+                        } label: {
+                            Image(systemName: "archivebox.fill")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 25, height: 25)
+                                .background {
+                                    Circle()
+                                        .fill(LinearGradient(colors: [.orange, .yellow], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                }
+                                .overlay {
+                                    Circle()
+                                        .stroke(.white.opacity(0.65), lineWidth: 1)
+                                }
+                                .shadow(color: .orange.opacity(0.35), radius: 4, y: 1)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Mark as done")
+                        .help("Mark as done")
+                        .frame(width: 24, height: 24)
+                        .padding(.trailing, 2)
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+
+                        Button {
                             onMarkAsRead(thread)
                         } label: {
                             Image(systemName: "checkmark")
