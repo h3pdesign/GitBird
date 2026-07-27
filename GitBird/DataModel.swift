@@ -288,7 +288,7 @@ struct GitHubAPIClient {
             URLQueryItem(name: "page", value: String(max(page, 1))),
             URLQueryItem(name: "per_page", value: String(min(max(perPage, 1), 50)))
         ] : [
-            URLQueryItem(name: "all", value: "true"),
+            URLQueryItem(name: "all", value: includeRead ? "true" : "false"),
             URLQueryItem(name: "page", value: String(max(page, 1))),
             URLQueryItem(name: "per_page", value: String(min(max(perPage, 1), 50)))
         ]
@@ -717,19 +717,18 @@ struct GitHubAPIClient {
                 }
 
                 await MainActor.run {
-                    self.notifications = firstPage
                     self.message = err
                     if ok {
+                        self.notifications = firstPage
                         self.lastPull = Date()
+                        self.nextNotificationsPage = hasNext ? 2 : nil
+                        self.hasMoreNotifications = self.nextNotificationsPage != nil
+                        self.isLoadingMoreNotifications = false
+                        self.loadMoreError = ""
+
+                        let ids = Set(firstPage.map { $0.id })
+                        self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { ids.contains($0.key) }
                     }
-
-                    self.nextNotificationsPage = hasNext ? 2 : nil
-                    self.hasMoreNotifications = self.nextNotificationsPage != nil
-                    self.isLoadingMoreNotifications = false
-                    self.loadMoreError = ""
-
-                    let ids = Set(firstPage.map { $0.id })
-                    self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { ids.contains($0.key) }
                 }
                 
                 if ok {
@@ -884,6 +883,7 @@ struct GitHubAPIClient {
                 await MainActor.run {
                     self?.markThreadsAsReadLocally(Set([threadId]))
                     self?.subjectDetailsByThreadId.removeValue(forKey: threadId)
+                    self?.message = "Marked as read"
                 }
             } catch {
                 AppLog.warning("Failed to mark notification as read: \(error)")
@@ -903,6 +903,7 @@ struct GitHubAPIClient {
                 await MainActor.run {
                     self?.notifications.removeAll { candidate in candidate.id == threadId }
                     self?.subjectDetailsByThreadId.removeValue(forKey: threadId)
+                    self?.message = "Marked as done"
                     self?.refreshNotifications()
                 }
             } catch {

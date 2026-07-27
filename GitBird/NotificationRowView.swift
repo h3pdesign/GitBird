@@ -13,11 +13,7 @@ struct NotificationRowView: View {
     var body: some View {
         let url = details?.htmlUrl ?? thread.subject.preferredWebURL()
 
-        Button {
-            guard let url else { return }
-            onOpen(thread, url)
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     ZStack {
                         Image(systemName: subjectTypeIconName(thread.subject.type))
@@ -118,22 +114,24 @@ struct NotificationRowView: View {
                 if !participants.isEmpty {
                     AvatarStackView(users: participants)
                 }
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .background {
-                if isHovering {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.primary.opacity(0.08))
-                        .transition(.opacity)
-                        .allowsHitTesting(false)
-                }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .background {
+            if isHovering {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(.primary.opacity(0.08))
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
             }
         }
-        .buttonStyle(.plain)
         .disabled(url == nil)
+        .onTapGesture {
+            guard let url else { return }
+            onOpen(thread, url)
+        }
         .focusable()
         .focusEffectDisabled()
         .onDeleteCommand {
