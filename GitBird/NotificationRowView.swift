@@ -104,6 +104,8 @@ struct NotificationRowView: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
+                statusBadgeView
+
                 if let reasonBadge {
                     Label(reasonBadge.title, systemImage: reasonBadge.symbolName)
                         .font(.caption2.weight(.medium))
@@ -195,6 +197,28 @@ struct NotificationRowView: View {
         default:
             return .primary
         }
+    }
+
+    private var statusBadgeView: some View {
+        Label(stateBadge.title, systemImage: stateBadge.symbolName)
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(stateBadge.color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(stateBadge.color.opacity(0.14), in: Capsule())
+    }
+
+    private var stateBadge: StatusBadge {
+        if thread.unread {
+            return StatusBadge(title: "Unread", symbolName: "circle.fill", color: .blue)
+        }
+        return StatusBadge(title: "Read", symbolName: "checkmark.circle.fill", color: .secondary)
+    }
+
+    private struct StatusBadge {
+        let title: String
+        let symbolName: String
+        let color: Color
     }
 
     private var reasonBadge: ReasonBadge? {
