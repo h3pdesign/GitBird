@@ -28,9 +28,13 @@ struct NotificationRowView: View {
 
                     if thread.unread {
                         Circle()
-                            .fill(.blue)
-                            .frame(width: 6, height: 6)
-                            .accessibilityHidden(true)
+                            .fill(LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .frame(width: 7, height: 7)
+                            .overlay {
+                                Circle()
+                                    .stroke(.white.opacity(0.7), lineWidth: 1)
+                            }
+                            .shadow(color: .blue.opacity(0.45), radius: 3)
                     }
 
                     Text(thread.repository.fullName)
@@ -43,10 +47,19 @@ struct NotificationRowView: View {
                         Button {
                             onMarkAsRead(thread)
                         } label: {
-                            Image(systemName: "checkmark.circle.fill")
-                                .symbolRenderingMode(.hierarchical)
-                                .font(.system(size: 13))
-                                .foregroundStyle(.green)
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 25, height: 25)
+                                .background {
+                                    Circle()
+                                        .fill(LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                }
+                                .overlay {
+                                    Circle()
+                                        .stroke(.white.opacity(0.65), lineWidth: 1)
+                                }
+                                .shadow(color: .green.opacity(0.35), radius: 4, y: 1)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Mark as read")

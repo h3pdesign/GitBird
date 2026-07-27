@@ -358,9 +358,7 @@ struct GitHubAPIClient {
         } else {
             threads = try decoder.decode([GitHubNotificationThread].self, from: data)
         }
-        let visibleThreads = includeRead ? threads : threads.filter { thread in
-            thread.unread || thread.lastReadAt == nil || thread.updatedAt > (thread.lastReadAt ?? .distantPast)
-        }
+        let visibleThreads = includeRead ? threads : threads.filter(\.unread)
         AppLog.debug("Notification visibility: fetched=\(threads.count), visible=\(visibleThreads.count), includeRead=\(includeRead)")
         let hasNext = linkHeaderHasNextPage(http.value(forHTTPHeaderField: "Link"))
         return (visibleThreads, hasNext)
