@@ -857,6 +857,24 @@ struct GitHubAPIClient {
         }
     }
 
+    private func markThreadsAsReadLocally(_ ids: Set<String>) {
+        let readAt = Date.now
+        for index in notifications.indices where ids.contains(notifications[index].id) {
+            let thread = notifications[index]
+            notifications[index] = GitHubNotificationThread(
+                id: thread.id,
+                repository: thread.repository,
+                subject: thread.subject,
+                reason: thread.reason,
+                unread: false,
+                updatedAt: thread.updatedAt,
+                lastReadAt: readAt,
+                url: thread.url,
+                subscriptionUrl: thread.subscriptionUrl
+            )
+        }
+    }
+
     func markNotificationAsRead(threadId: String) {
         guard let thread = notifications.first(where: { $0.id == threadId }) else { return }
         let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: URL(string: gitlabBaseURL))
@@ -864,9 +882,8 @@ struct GitHubAPIClient {
             do {
                 try await api.markThreadAsRead(url: thread.url)
                 await MainActor.run {
-                    self?.notifications.removeAll { $0.id == threadId }
+                    self?.markThreadsAsReadLocally(Set([threadId]))
                     self?.subjectDetailsByThreadId.removeValue(forKey: threadId)
-                    self?.refreshNotifications()
                 }
             } catch {
                 AppLog.warning("Failed to mark notification as read: \(error)")
@@ -943,12 +960,8 @@ struct GitHubAPIClient {
                 try await api.markAllNotificationsAsRead(lastReadAt: lastReadAt, urls: targetURLs)
                 await MainActor.run {
                     guard let self else { return }
-                    self.notifications.removeAll { targetIDs.contains($0.id) }
-                    self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { !targetIDs.contains($0.key) }
-                    self.nextNotificationsPage = nil
-                    self.hasMoreNotifications = false
+                    self.markThreadsAsReadLocally(targetIDs)
                     self.isMarkingAllNotificationsAsRead = false
-                    self.refreshNotifications()
                 }
             } catch {
                 AppLog.warning("Failed to mark all notifications as read: \(error)")

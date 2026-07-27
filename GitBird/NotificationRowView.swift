@@ -135,7 +135,7 @@ struct NotificationRowView: View {
         .focusable()
         .focusEffectDisabled()
         .onDeleteCommand {
-            guard thread.unread else { return }
+
             onMarkAsDone(thread)
         }
         .help("Open notification. Press Delete to mark as done.")
