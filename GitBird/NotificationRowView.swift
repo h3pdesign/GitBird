@@ -109,6 +109,7 @@ struct NotificationRowView: View {
         .buttonStyle(.plain)
         .disabled(url == nil)
         .focusable()
+        .focusEffectDisabled()
         .onDeleteCommand {
             guard thread.unread else { return }
             onMarkAsDone(thread)
