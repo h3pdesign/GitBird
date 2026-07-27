@@ -400,6 +400,20 @@ struct GitHubAPIClient {
         }
     }
 
+    func markAllNotificationsAsDone(urls: [URL]) async throws {
+        if provider == .gitlab {
+            var request = makeRequest(url: baseURL.appendingPathComponent("api/v4/todos/mark_as_done"))
+            request.httpMethod = "POST"
+            let (_, response) = try await Self.session.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw APIError.invalidResponse }
+            return
+        }
+
+        for url in urls {
+            try await markThreadAsDone(url: url)
+        }
+    }
+
     func markAllNotificationsAsRead(lastReadAt: Date?, urls: [URL] = []) async throws {
         if provider == .gitlab {
             var request = makeRequest(url: baseURL.appendingPathComponent("api/v4/todos/mark_as_done"))
@@ -492,6 +506,7 @@ struct GitHubAPIClient {
     @Published private(set) var isRefreshing: Bool = false
     @Published private(set) var loadMoreError: String = ""
     @Published private(set) var isMarkingAllNotificationsAsRead: Bool = false
+    @Published private(set) var isMarkingAllNotificationsAsDone: Bool = false
 
     @Published var listLength: Int = 10 {
         willSet(newValue) {
@@ -851,6 +866,7 @@ struct GitHubAPIClient {
                 await MainActor.run {
                     self?.notifications.removeAll { $0.id == threadId }
                     self?.subjectDetailsByThreadId.removeValue(forKey: threadId)
+                    self?.refreshNotifications()
                 }
             } catch {
                 AppLog.warning("Failed to mark notification as read: \(error)")
@@ -870,11 +886,42 @@ struct GitHubAPIClient {
                 await MainActor.run {
                     self?.notifications.removeAll { candidate in candidate.id == threadId }
                     self?.subjectDetailsByThreadId.removeValue(forKey: threadId)
+                    self?.refreshNotifications()
                 }
             } catch {
                 AppLog.warning("Failed to mark notification as done: \(error)")
                 await MainActor.run {
                     self?.message = "Failed to mark as done"
+                }
+            }
+        }
+    }
+
+    func markAllNotificationsAsDone() {
+        guard !notifications.isEmpty else { return }
+        guard !isMarkingAllNotificationsAsDone else { return }
+        guard !accessToken.isEmpty else { return }
+
+        let targetIDs = Set(notifications.map(\.id))
+        let targetURLs = notifications.map(\.url)
+        let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: URL(string: gitlabBaseURL))
+        isMarkingAllNotificationsAsDone = true
+
+        Task.detached(priority: .utility) { [weak self, targetIDs, targetURLs] in
+            do {
+                try await api.markAllNotificationsAsDone(urls: targetURLs)
+                await MainActor.run {
+                    guard let self else { return }
+                    self.isMarkingAllNotificationsAsDone = false
+                    self.notifications.removeAll { targetIDs.contains($0.id) }
+                    self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { !targetIDs.contains($0.key) }
+                    self.refreshNotifications()
+                }
+            } catch {
+                AppLog.warning("Failed to mark all notifications as done")
+                await MainActor.run {
+                    self?.isMarkingAllNotificationsAsDone = false
+                    self?.message = "Failed to mark all as done"
                 }
             }
         }
@@ -901,6 +948,7 @@ struct GitHubAPIClient {
                     self.nextNotificationsPage = nil
                     self.hasMoreNotifications = false
                     self.isMarkingAllNotificationsAsRead = false
+                    self.refreshNotifications()
                 }
             } catch {
                 AppLog.warning("Failed to mark all notifications as read: \(error)")

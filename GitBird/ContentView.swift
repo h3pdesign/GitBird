@@ -125,6 +125,26 @@ struct ContentView: View {
             .help("Mark all as read")
 
             Button {
+                runtimeData.markAllNotificationsAsDone()
+            } label: {
+                if runtimeData.isMarkingAllNotificationsAsDone {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 24, height: 24)
+                } else {
+                    Image(systemName: "archivebox.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.orange)
+                        .frame(width: 24, height: 24)
+                }
+            }
+            .modifier(GlassHeaderButtonStyle())
+            .controlSize(.regular)
+            .disabled(runtimeData.notifications.isEmpty || runtimeData.isMarkingAllNotificationsAsDone)
+            .help("Mark all as done")
+
+            Button {
                 openURL(runtimeData.provider.notificationsURL)
             } label: {
                 Image(systemName: "safari")
