@@ -1,6 +1,6 @@
 # GitBird
 
-Show GitHub notifications on menubar.
+Show GitHub and GitLab notifications in the menu bar.
 
 <p align="center">
   <img src="./assets/screenshot.png" alt="preview">

@@ -272,7 +272,7 @@ private struct AboutSettingsView: View {
                 }
             }
 
-            Text("A lightweight menubar app for GitHub notifications.")
+            Text("A lightweight menu bar app for GitHub and GitLab notifications.")
                 .foregroundStyle(.secondary)
 
             Divider()
