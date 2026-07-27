@@ -14,8 +14,12 @@ Show GitHub notifications on menubar.
 
 ## Usage
 
-1. Download the latest build from [Releases](https://github.com/0x2E/GitStatus/releases).
+1. Download the latest build from [Releases](https://github.com/h3pdesign/GitBird/releases).
 2. Open Settings and fill in the required configuration (e.g. GitHub token).
+
+## Lineage
+
+GitBird is a standalone continuation of [GitStatus](https://github.com/0x2E/GitStatus), redesigned and extended with GitHub and GitLab support. It has its own repository and release identity.
 
 ## Credits
 

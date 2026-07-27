@@ -125,7 +125,7 @@ struct ContentView: View {
             .help("Mark all as read")
 
             Button {
-                openURL(URL(string: "https://github.com/notifications")!)
+                openURL(runtimeData.provider.notificationsURL)
             } label: {
                 Image(systemName: "safari")
                     .symbolRenderingMode(.hierarchical)

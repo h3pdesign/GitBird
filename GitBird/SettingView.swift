@@ -33,7 +33,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return "General"
-        case .token: return "GitHub"
+        case .token: return "Account"
         case .about: return "About"
         }
     }
@@ -166,6 +166,12 @@ private struct GeneralSettingsView: View {
                             .labelsHidden()
                         }
                     }
+                    Toggle("Hide read notifications", isOn: Binding(
+                        get: { runtimeData.hideReadNotifications },
+                        set: { newValue in runtimeData.hideReadNotifications = newValue }
+                    ))
+                    .help("When enabled, only notifications GitHub still marks unread are shown.")
+
                 } header: {
                     Text("Notifications")
                 } footer: {
@@ -191,7 +197,19 @@ private struct TokenSettingsView: View {
         ScrollView {
             Form {
                 Section {
-                    SecureField("Personal access token", text: $runtimeData.githubToken)
+                    Picker("Provider", selection: $runtimeData.provider) {
+                        ForEach(NotificationProvider.allCases) { provider in
+                            Text(provider.displayName).tag(provider)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if runtimeData.provider == .gitlab {
+                        TextField("GitLab host", text: $runtimeData.gitlabBaseURL)
+                            .textContentType(.URL)
+                    }
+
+                    SecureField(runtimeData.provider == .github ? "Personal access token" : "Personal access token", text: $runtimeData.accessToken)
                         .textContentType(.password)
                         .disabled(tokenChecking)
 
@@ -199,16 +217,16 @@ private struct TokenSettingsView: View {
                         Button("Verify token") {
                             tokenChecking = true
                             Task {
-                                let (ok, err) = await runtimeData.testGithubToken()
+                                let (ok, err) = await runtimeData.testAccessToken()
                                 tokenChecking = false
                                 showTokenAlert = true
-                                tokenAlertTitle = ok ? "Token verified" : "Token verification failed"
+                                tokenAlertTitle = ok ? "Token verified" : "Access token verification failed"
                                 tokenAlertContent = err
 
                                 if ok {
-                                    AppLog.info("Token verification succeeded")
+                                    AppLog.info("Access token verification succeeded")
                                 } else {
-                                    AppLog.warning("Token verification failed: \(err)")
+                                    AppLog.warning("Access token verification failed: \(err)")
                                 }
                             }
                         }
@@ -225,18 +243,18 @@ private struct TokenSettingsView: View {
                 } header: {
                     Text("Access Token")
                 } footer: {
-                    Text("Only the Notifications permission is required. Mark all as read requires a classic personal access token.")
+                    Text(runtimeData.provider == .github ? "GitHub notifications and read state use the GitHub API." : "GitLab Todos are used as notifications; marking read completes the Todo on GitLab.")
                 }
 
                 Section("Help") {
-                    Link("Open token settings", destination: URL(string: "https://github.com/settings/tokens")!)
+                    Link("Open \(runtimeData.provider.displayName) token settings", destination: runtimeData.provider.loginURL)
                 }
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
             .padding(20)
         }
-        .navigationTitle("GitHub")
+        .navigationTitle("Account")
     }
 }
 
@@ -261,8 +279,8 @@ private struct AboutSettingsView: View {
 
             Form {
                 Section("Links") {
-                    Link("GitHub repository", destination: URL(string: "https://github.com/0x2E/GitStatus")!)
-                    Link("Report an issue", destination: URL(string: "https://github.com/0x2E/GitStatus/issues")!)
+                    Link("GitHub repository", destination: URL(string: "https://github.com/h3pdesign/GitBird")!)
+                    Link("Report an issue", destination: URL(string: "https://github.com/h3pdesign/GitBird/issues")!)
                 }
 
                 Section {

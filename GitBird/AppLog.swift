@@ -3,18 +3,18 @@ import Foundation
 import OSLog
 
 enum AppLog {
-    private static let subsystem = Bundle.main.bundleIdentifier ?? "GitStatus"
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "GitBird"
     private static let logger = Logger(subsystem: subsystem, category: "app")
     private static let file = LogFile(fileURL: logFileURL)
 
     static var logDirectoryURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-        let dir = appSupport?.appending(path: "GitStatus/Logs", directoryHint: .isDirectory)
-        return dir ?? URL(fileURLWithPath: NSTemporaryDirectory()).appending(path: "GitStatus/Logs", directoryHint: .isDirectory)
+        let dir = appSupport?.appending(path: "GitBird/Logs", directoryHint: .isDirectory)
+        return dir ?? URL(fileURLWithPath: NSTemporaryDirectory()).appending(path: "GitBird/Logs", directoryHint: .isDirectory)
     }
 
     static var logFileURL: URL {
-        logDirectoryURL.appending(path: "GitStatus.log", directoryHint: .notDirectory)
+        logDirectoryURL.appending(path: "GitBird.log", directoryHint: .notDirectory)
     }
 
     static func bootstrap() {
