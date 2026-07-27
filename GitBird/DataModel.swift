@@ -288,7 +288,7 @@ struct GitHubAPIClient {
             URLQueryItem(name: "page", value: String(max(page, 1))),
             URLQueryItem(name: "per_page", value: String(min(max(perPage, 1), 50)))
         ] : [
-            URLQueryItem(name: "all", value: String(includeRead)),
+            URLQueryItem(name: "all", value: "true"),
             URLQueryItem(name: "page", value: String(max(page, 1))),
             URLQueryItem(name: "per_page", value: String(min(max(perPage, 1), 50)))
         ]
@@ -358,7 +358,10 @@ struct GitHubAPIClient {
         } else {
             threads = try decoder.decode([GitHubNotificationThread].self, from: data)
         }
-        let visibleThreads = threads
+        let visibleThreads = includeRead ? threads : threads.filter { thread in
+            thread.unread || thread.lastReadAt == nil || thread.updatedAt > (thread.lastReadAt ?? .distantPast)
+        }
+        AppLog.debug("Notification visibility: fetched=\(threads.count), visible=\(visibleThreads.count), includeRead=\(includeRead)")
         let hasNext = linkHeaderHasNextPage(http.value(forHTTPHeaderField: "Link"))
         return (visibleThreads, hasNext)
     }
