@@ -27,7 +27,9 @@ struct ContentView: View {
         .task(id: prefetchKey) {
             guard runtimeData.message.isEmpty else { return }
             guard !runtimeData.notifications.isEmpty else { return }
-            runtimeData.prefetchSubjectDetails(for: runtimeData.notifications)
+            // Details are only needed for the first visible rows. Deferring the
+            // rest avoids a burst of subject requests when a large inbox loads.
+            runtimeData.prefetchSubjectDetails(for: Array(runtimeData.notifications.prefix(12)))
         }
     }
 

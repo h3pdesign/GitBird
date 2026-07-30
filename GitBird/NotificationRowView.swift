@@ -139,7 +139,9 @@ struct NotificationRowView: View {
             onMarkAsDone(thread)
         }
         .help("Open notification. Press Delete to mark as done.")
-        .background(HoverTrackingView(isHovering: $isHovering))
+        .onHover { hovering in
+            isHovering = hovering
+        }
         .animation(.easeOut(duration: 0.12), value: isHovering)
     }
 
@@ -283,88 +285,6 @@ private struct AvatarImageView: View {
         )
         .task {
             await loader.load()
-        }
-    }
-}
-
-private struct HoverTrackingView: NSViewRepresentable {
-    @Binding var isHovering: Bool
-
-    func makeNSView(context: Context) -> TrackingNSView {
-        let view = TrackingNSView()
-        view.onHoverChanged = { hovering in
-            scheduleHoverStateUpdate(hovering)
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: TrackingNSView, context: Context) {
-        nsView.onHoverChanged = { hovering in
-            scheduleHoverStateUpdate(hovering)
-        }
-        nsView.updateHoverState()
-    }
-
-    private func scheduleHoverStateUpdate(_ hovering: Bool) {
-        Task { @MainActor in
-            await Task.yield()
-            guard isHovering != hovering else { return }
-            isHovering = hovering
-        }
-    }
-
-    final class TrackingNSView: NSView {
-        var onHoverChanged: ((Bool) -> Void)?
-        private var trackingAreaRef: NSTrackingArea?
-
-        override func hitTest(_ point: NSPoint) -> NSView? {
-            nil
-        }
-
-        override func updateTrackingAreas() {
-            super.updateTrackingAreas()
-
-            if let trackingAreaRef {
-                removeTrackingArea(trackingAreaRef)
-            }
-
-            let options: NSTrackingArea.Options = [
-                .mouseEnteredAndExited,
-                .activeAlways,
-                .inVisibleRect
-            ]
-            let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-            addTrackingArea(area)
-            trackingAreaRef = area
-
-            updateHoverState()
-        }
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            Task { @MainActor in
-                await Task.yield()
-                updateHoverState()
-            }
-        }
-
-        override func mouseEntered(with event: NSEvent) {
-            super.mouseEntered(with: event)
-            onHoverChanged?(true)
-        }
-
-        override func mouseExited(with event: NSEvent) {
-            super.mouseExited(with: event)
-            onHoverChanged?(false)
-        }
-
-        func updateHoverState() {
-            guard let window else { return }
-
-            let mouseOnScreen = NSEvent.mouseLocation
-            let mouseInWindow = window.convertPoint(fromScreen: mouseOnScreen)
-            let mouseInView = convert(mouseInWindow, from: nil)
-            onHoverChanged?(bounds.contains(mouseInView))
         }
     }
 }

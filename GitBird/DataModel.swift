@@ -808,9 +808,11 @@ struct GitHubAPIClient {
         self.detailsTask?.cancel()
 
         let token = self.accessToken
+        var seenURLs = Set<URL>()
         let targets = threads.compactMap { thread -> (String, URL)? in
             guard subjectDetailsByThreadId[thread.id] == nil else { return nil }
             guard let url = thread.subject.url else { return nil }
+            guard seenURLs.insert(url).inserted else { return nil }
             return (thread.id, url)
         }
 
