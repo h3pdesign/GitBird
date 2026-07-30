@@ -2,6 +2,15 @@
 
 All notable changes to GitBird are documented here.
 
+## [2.1.1] - 2026-07-30
+
+### Performance
+
+- Replaced per-row AppKit hover tracking with native SwiftUI hover handling.
+- Bounded subject-detail prefetching to the first 12 visible notifications.
+- Deduplicated subject-detail requests by URL.
+- Reduced view and network overhead while scrolling and opening the menu bar window.
+
 ## [2.1.0] - 2026-07-27
 
 ### Added
