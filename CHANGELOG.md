@@ -2,6 +2,14 @@
 
 All notable changes to GitBird are documented here.
 
+## [2.1.2] - 2026-08-01
+
+### Fixed
+
+- Manual refresh now restarts the automatic background polling task.
+- Temporary network failures retry with exponential backoff instead of permanently stopping refresh.
+- Refresh interval guidance now explains automatic polling and retry behavior.
+
 ## [2.1.1] - 2026-07-30
 
 ### Performance

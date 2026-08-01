@@ -175,7 +175,7 @@ private struct GeneralSettingsView: View {
                 } header: {
                     Text("Notifications")
                 } footer: {
-                    Text("GitHub API has rate limits (commonly 5000 requests/hour per user).")
+                    Text("GitBird refreshes automatically while it is running. The interval applies to successful polls; temporary failures retry with a backoff. GitHub API has rate limits (commonly 5000 requests/hour per user).")
                 }
             }
             .formStyle(.grouped)

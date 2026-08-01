@@ -670,6 +670,9 @@ struct GitHubAPIClient {
                 if ok {
                     self.prefetchSubjectDetails(for: firstPage)
                 }
+                // Manual refresh replaces the polling task. Start it again so
+                // one explicit refresh cannot silently disable background sync.
+                self.renewPullTask(interval: self.interval)
             }
         }
     }
@@ -737,12 +740,15 @@ struct GitHubAPIClient {
                     failsCount += 1
                 }
 
-                if Task.isCancelled || failsCount >= 3 {
-                    AppLog.debug("Stopping pull task (cancelled=\(Task.isCancelled), fails=\(failsCount))")
+                if Task.isCancelled {
+                    AppLog.debug("Stopping pull task (cancelled=true)")
                     return
                 }
-                
-                try? await Task.sleep(for: .seconds(interval))
+
+                let baseDelay = max(interval, 30)
+                let retryMultiplier = 1 << min(failsCount, 4)
+                let delay = min(baseDelay * retryMultiplier, 900)
+                try? await Task.sleep(for: .seconds(delay))
             } while(!Task.isCancelled)
         }
     }
