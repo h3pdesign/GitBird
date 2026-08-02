@@ -1,0 +1,168 @@
+name: Release GitBird (notarized)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing Git tag to release (for example, v2.1.3)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 120
+    concurrency:
+      group: gitbird-release-${{ inputs.tag }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          git init
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "refs/tags/${TAG_NAME}"
+          git checkout FETCH_HEAD
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          XCODE_PATH="$(find /Applications -maxdepth 1 -name 'Xcode*.app' -print | sort -V | tail -n1)"
+          if [[ -z "${XCODE_PATH}" ]]; then
+            echo "No Xcode installation found." >&2
+            exit 1
+          fi
+          sudo xcode-select --switch "${XCODE_PATH}/Contents/Developer"
+          xcodebuild -version
+
+      - name: Import signing certificate
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [[ -n "${MACOS_CERT_P12}" && -n "${MACOS_CERT_PASSWORD}" && -n "${KEYCHAIN_PASSWORD}" ]] || {
+            echo "Missing MACOS_CERT_P12, MACOS_CERT_PASSWORD, or KEYCHAIN_PASSWORD repository/org secret." >&2
+            exit 1
+          }
+          KEYCHAIN="${RUNNER_TEMP}/gitbird-build.keychain-db"
+          printf '%s' "${MACOS_CERT_P12}" | base64 --decode > "${RUNNER_TEMP}/certificate.p12"
+          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN}"
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN}"
+          security set-keychain-settings -lut 21600 "${KEYCHAIN}"
+          security import "${RUNNER_TEMP}/certificate.p12" -k "${KEYCHAIN}" -P "${MACOS_CERT_PASSWORD}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN}"
+          security list-keychains -d user -s "${KEYCHAIN}"
+          security default-keychain -d user -s "${KEYCHAIN}"
+
+      - name: Install provisioning profile
+        env:
+          MACOS_APP_PROVISIONING_PROFILE: ${{ secrets.MACOS_APP_PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+          [[ -n "${MACOS_APP_PROVISIONING_PROFILE}" ]] || {
+            echo "Missing MACOS_APP_PROVISIONING_PROFILE repository/org secret." >&2
+            exit 1
+          }
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "${PROFILE_DIR}"
+          PROFILE_PATH="${RUNNER_TEMP}/GitBird.provisionprofile"
+          PROFILE_PLIST="${RUNNER_TEMP}/GitBird-profile.plist"
+          printf '%s' "${MACOS_APP_PROVISIONING_PROFILE}" | base64 --decode > "${PROFILE_PATH}"
+          security cms -D -i "${PROFILE_PATH}" > "${PROFILE_PLIST}"
+          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print UUID' "${PROFILE_PLIST}")"
+          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print Name' "${PROFILE_PLIST}")"
+          cp "${PROFILE_PATH}" "${PROFILE_DIR}/${PROFILE_UUID}.provisionprofile"
+          echo "GITBIRD_PROFILE_NAME=${PROFILE_NAME}" >> "${GITHUB_ENV}"
+
+      - name: Build archive
+        env:
+          ARCHIVE_PATH: ${{ runner.temp }}/GitBird.xcarchive
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project GitBird.xcodeproj \
+            -scheme GitBird \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath "${ARCHIVE_PATH}" \
+            DEVELOPMENT_TEAM=CS727NF72U \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY='Developer ID Application' \
+            PROVISIONING_PROFILE_SPECIFIER="${GITBIRD_PROFILE_NAME}" \
+            archive
+
+      - name: Export app
+        env:
+          ARCHIVE_PATH: ${{ runner.temp }}/GitBird.xcarchive
+          EXPORT_PATH: ${{ runner.temp }}/GitBird-export
+        run: |
+          set -euo pipefail
+          mkdir -p "${EXPORT_PATH}"
+          cat > export-options.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>developer-id</string>
+            <key>teamID</key><string>CS727NF72U</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key><dict>
+              <key>com.h3p.GitBird</key><string>${GITBIRD_PROFILE_NAME}</string>
+            </dict>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "${ARCHIVE_PATH}" \
+            -exportPath "${EXPORT_PATH}" \
+            -exportOptionsPlist export-options.plist
+
+      - name: Notarize and staple
+        env:
+          EXPORT_PATH: ${{ runner.temp }}/GitBird-export
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [[ -n "${APPLE_ID}" && -n "${APPLE_TEAM_ID}" && -n "${APPLE_APP_SPECIFIC_PASSWORD}" ]] || {
+            echo "Missing APPLE_ID, APPLE_TEAM_ID, or APPLE_APP_SPECIFIC_PASSWORD repository/org secret." >&2
+            exit 1
+          }
+          APP="${EXPORT_PATH}/GitBird.app"
+          ditto -c -k --keepParent "${APP}" GitBird-submit.zip
+          xcrun notarytool submit GitBird-submit.zip \
+            --apple-id "${APPLE_ID}" \
+            --team-id "${APPLE_TEAM_ID}" \
+            --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
+            --wait
+          xcrun stapler staple "${APP}"
+          xcrun stapler validate "${APP}"
+          spctl --assess --type execute --verbose=4 "${APP}"
+
+      - name: Package and verify
+        env:
+          EXPORT_PATH: ${{ runner.temp }}/GitBird-export
+          TAG_NAME: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          APP="${EXPORT_PATH}/GitBird.app"
+          ditto -c -k --keepParent "${APP}" "GitBird-${TAG_NAME#v}.zip"
+          shasum -a 256 "GitBird-${TAG_NAME#v}.zip" > SHA256SUMS.txt
+          codesign --verify --deep --strict --verbose=2 "${APP}"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "${TAG_NAME}" "GitBird-${TAG_NAME#v}.zip" SHA256SUMS.txt --clobber
+          gh release edit "${TAG_NAME}" --title "GitBird ${TAG_NAME}" --generate-notes --draft=false --latest

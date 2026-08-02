@@ -2,6 +2,13 @@
 
 All notable changes to GitBird are documented here.
 
+## [2.1.3] - 2026-08-02
+
+### Distribution
+
+- Added the GitHub-hosted Developer ID build, notarization, stapling, and release-asset verification workflow.
+- Prepared distribution metadata for the notarized macOS app release.
+
 ## [2.1.2] - 2026-08-01
 
 ### Fixed
@@ -47,4 +54,3 @@ All notable changes to GitBird are documented here.
 ## [2.0.2] - 2026-07-27
 
 - Kept read notifications available for the done action.
-

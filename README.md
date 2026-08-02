@@ -20,7 +20,7 @@ A native macOS menu bar app for keeping GitHub and GitLab notifications close at
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.0](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.0).
+See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.3](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.3).
 
 ## Requirements
 
