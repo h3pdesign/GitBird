@@ -164,5 +164,12 @@ jobs:
           TAG_NAME: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          gh release upload "${TAG_NAME}" "GitBird-${TAG_NAME#v}.zip" SHA256SUMS.txt --clobber
-          gh release edit "${TAG_NAME}" --title "GitBird ${TAG_NAME}" --generate-notes --draft=false --latest
+          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            gh release upload "${TAG_NAME}" "GitBird-${TAG_NAME#v}.zip" SHA256SUMS.txt --clobber
+            gh release edit "${TAG_NAME}" --title "GitBird ${TAG_NAME}" --draft=false --latest
+          else
+            gh release create "${TAG_NAME}" "GitBird-${TAG_NAME#v}.zip" SHA256SUMS.txt \
+              --title "GitBird ${TAG_NAME}" \
+              --generate-notes \
+              --latest
+          fi
