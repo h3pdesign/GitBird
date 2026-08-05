@@ -689,12 +689,13 @@ struct GitHubAPIClient: Sendable {
         self.interval = (defaults.object(forKey: "interval") as? Int) ?? 300
         self.listLength = (defaults.object(forKey: "listLength") as? Int) ?? 10
         self.hideReadNotifications = defaults.object(forKey: "hideReadNotifications") as? Bool ?? true
-        self.provider = NotificationProvider(rawValue: defaults.string(forKey: "provider") ?? "") ?? .github
+        let selectedProvider = NotificationProvider(rawValue: defaults.string(forKey: "provider") ?? "") ?? .github
+        self.provider = selectedProvider
         self.gitlabBaseURL = defaults.string(forKey: "gitlabBaseURL") ?? "https://gitlab.com"
         let legacyToken = defaults.string(forKey: "accessToken") ?? defaults.string(forKey: "githubToken")
-        let storedToken = TokenStore.token(for: self.provider)
+        let storedToken = TokenStore.token(for: selectedProvider)
         if storedToken == nil, let legacyToken {
-            TokenStore.set(legacyToken, for: self.provider)
+            TokenStore.set(legacyToken, for: selectedProvider)
         }
         self.accessToken = storedToken ?? legacyToken ?? ""
         defaults.removeObject(forKey: "accessToken")
