@@ -74,7 +74,7 @@ The project uses Swift 6 and enables complete strict-concurrency checking in Deb
 
 ## Privacy and credentials
 
-GitBird sends access-token-authenticated HTTPS requests only to the provider selected in Settings and to the notification subject URLs needed to display details. Tokens are stored in the app UserDefaults configuration today; use a dedicated token with the minimum permissions required by your provider.
+GitBird sends access-token-authenticated HTTPS requests only to the provider selected in Settings. GitHub tokens are used for approved GitHub API URLs; GitLab tokens are used only with the configured HTTPS GitLab host. Tokens are stored in the macOS Keychain, and legacy UserDefaults tokens are migrated and removed on first launch. Use a dedicated token with the minimum permissions required by your provider.
 
 ## Lineage
 

@@ -2,6 +2,20 @@
 
 All notable changes to GitBird are documented here.
 
+## [2.1.4] - 2026-08-05
+
+### Security and reliability
+
+- Store GitHub and GitLab access tokens in the macOS Keychain and migrate legacy UserDefaults tokens.
+- Restrict authenticated API mutations and provider requests to approved HTTPS hosts.
+- Prevent stale refresh and bulk-action results from overwriting newer account state.
+
+### Provider support and usability
+
+- Use configured self-hosted GitLab URLs for browser and token-settings links.
+- Clarify GitLab Todo completion actions and provider-neutral settings guidance.
+- Improve keyboard activation, accessibility labels, avatar loading, and unread menu-bar counts.
+
 ## [2.1.3] - 2026-08-02
 
 ### Distribution

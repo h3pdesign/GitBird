@@ -11,7 +11,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var runtimeData: RuntimeData
     @Environment(\.openURL) private var openURL
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
      
     var body: some View {
@@ -25,7 +25,7 @@ struct ContentView: View {
         .background(MenuBarWindowSurface())
         .frame(width: 420)
         .task(id: prefetchKey) {
-            guard runtimeData.message.isEmpty else { return }
+            guard runtimeData.errorMessage.isEmpty else { return }
             guard !runtimeData.notifications.isEmpty else { return }
             // Details are only needed for the first visible rows. Deferring the
             // rest avoids a burst of subject requests when a large inbox loads.
@@ -104,6 +104,7 @@ struct ContentView: View {
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
             .disabled(runtimeData.isRefreshing)
+            .accessibilityLabel("Refresh notifications")
             .help("Refresh")
 
             Button {
@@ -124,7 +125,8 @@ struct ContentView: View {
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
             .disabled(runtimeData.notifications.isEmpty || runtimeData.isMarkingAllNotificationsAsRead)
-            .help("Mark all as read")
+            .accessibilityLabel(runtimeData.provider == .gitlab ? "Complete all GitLab Todos" : "Mark all notifications as read")
+            .help(runtimeData.provider == .gitlab ? "Complete all Todos" : "Mark all as read")
 
             Button {
                 runtimeData.markAllNotificationsAsDone()
@@ -144,10 +146,11 @@ struct ContentView: View {
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
             .disabled(runtimeData.notifications.isEmpty || runtimeData.isMarkingAllNotificationsAsDone)
+            .accessibilityLabel("Mark all notifications as done")
             .help("Mark all as done")
 
             Button {
-                openURL(runtimeData.provider.notificationsURL)
+                openURL(runtimeData.providerNotificationsURL)
             } label: {
                 Image(systemName: "safari")
                     .symbolRenderingMode(.hierarchical)
@@ -156,11 +159,12 @@ struct ContentView: View {
             }
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
+            .accessibilityLabel("Open notifications in browser")
             .help("Open in Browser")
 
             Button {
                 NSApp.activate(ignoringOtherApps: true)
-                openWindow(id: "settings")
+                openSettings()
             } label: {
                 Image(systemName: "gearshape")
                     .symbolRenderingMode(.hierarchical)
@@ -169,6 +173,7 @@ struct ContentView: View {
             }
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
+            .accessibilityLabel("Open Settings")
             .help("Settings")
 
             Button {
@@ -181,14 +186,18 @@ struct ContentView: View {
             }
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
+            .accessibilityLabel("Quit GitBird")
             .help("Quit")
             .keyboardShortcut("q")
         }
     }
 
     private var subtitle: String {
-        if !runtimeData.message.isEmpty {
+        if !runtimeData.errorMessage.isEmpty {
             return "Error"
+        }
+        if !runtimeData.statusMessage.isEmpty {
+            return runtimeData.statusMessage
         }
         if runtimeData.notifications.isEmpty {
             return "All caught up"
@@ -201,7 +210,7 @@ struct ContentView: View {
     }
 
     private var subtitleColor: Color {
-        if !runtimeData.message.isEmpty {
+        if !runtimeData.errorMessage.isEmpty {
             return .red
         }
         if runtimeData.notifications.isEmpty {
@@ -212,13 +221,13 @@ struct ContentView: View {
 
     @ViewBuilder
     private var content: some View {
-        if !runtimeData.message.isEmpty {
+        if !runtimeData.errorMessage.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.triangle")
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.orange)
-                    Text(runtimeData.message)
+                    Text(runtimeData.errorMessage)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -269,7 +278,9 @@ struct ContentView: View {
                                     },
                                     onMarkAsRead: { thread in
                                         runtimeData.markNotificationAsRead(threadId: thread.id)
-                                    }
+                                    },
+                                    readActionTitle: runtimeData.provider == .gitlab ? "Complete Todo" : "Mark as read",
+                                    allowedAvatarHosts: runtimeData.allowedAvatarHosts
                                 )
                             }
                         }

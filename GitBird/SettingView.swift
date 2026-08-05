@@ -155,7 +155,7 @@ private struct GeneralSettingsView: View {
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 72)
                                 .textFieldStyle(.roundedBorder)
-                                .help("How often to refresh GitHub notifications")
+                                .help("How often to refresh notifications")
 
                             Text("s")
                                 .foregroundStyle(.secondary)
@@ -170,12 +170,12 @@ private struct GeneralSettingsView: View {
                         get: { runtimeData.hideReadNotifications },
                         set: { newValue in runtimeData.hideReadNotifications = newValue }
                     ))
-                    .help("When enabled, only notifications GitHub still marks unread are shown.")
+                    .help("When enabled, only notifications the selected provider still marks unread or pending are shown.")
 
                 } header: {
                     Text("Notifications")
                 } footer: {
-                    Text("GitBird refreshes automatically while it is running. The interval applies to successful polls; temporary failures retry with a backoff. GitHub API has rate limits (commonly 5000 requests/hour per user).")
+                    Text("GitBird refreshes automatically while it is running. The interval applies to successful polls; temporary failures retry with a backoff. Provider API rate limits apply.")
                 }
             }
             .formStyle(.grouped)
@@ -207,6 +207,7 @@ private struct TokenSettingsView: View {
                     if runtimeData.provider == .gitlab {
                         TextField("GitLab host", text: $runtimeData.gitlabBaseURL)
                             .textContentType(.URL)
+                            .help("Use an HTTPS host such as https://gitlab.com; paths, queries, and fragments are not allowed.")
                     }
 
                     SecureField(runtimeData.provider == .github ? "Personal access token" : "Personal access token", text: $runtimeData.accessToken)
@@ -247,7 +248,7 @@ private struct TokenSettingsView: View {
                 }
 
                 Section("Help") {
-                    Link("Open \(runtimeData.provider.displayName) token settings", destination: runtimeData.provider.loginURL)
+                    Link("Open \(runtimeData.provider.displayName) token settings", destination: runtimeData.providerLoginURL)
                 }
             }
             .formStyle(.grouped)

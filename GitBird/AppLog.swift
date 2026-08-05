@@ -24,23 +24,23 @@ enum AppLog {
     }
 
     static func info(_ message: String) {
-        logger.info("\(message, privacy: .public)")
+        logger.info("\(message, privacy: .private)")
         Task { await file.append(level: "INFO", message: message) }
     }
 
     static func warning(_ message: String) {
-        logger.warning("\(message, privacy: .public)")
+        logger.warning("\(message, privacy: .private)")
         Task { await file.append(level: "WARN", message: message) }
     }
 
     static func error(_ message: String) {
-        logger.error("\(message, privacy: .public)")
+        logger.error("\(message, privacy: .private)")
         Task { await file.append(level: "ERROR", message: message) }
     }
 
 #if DEBUG
     static func debug(_ message: String) {
-        logger.debug("\(message, privacy: .public)")
+        logger.debug("\(message, privacy: .private)")
         Task { await file.append(level: "DEBUG", message: message) }
     }
 #else

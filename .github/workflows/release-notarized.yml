@@ -32,6 +32,7 @@ jobs:
           git checkout FETCH_HEAD
 
       - name: Select Xcode
+        id: xcode
         run: |
           set -euo pipefail
           XCODE_PATH="$(find /Applications -maxdepth 1 -name 'Xcode*.app' -print | sort -V | tail -n1)"
@@ -41,6 +42,11 @@ jobs:
           fi
           sudo xcode-select --switch "${XCODE_PATH}/Contents/Developer"
           xcodebuild -version
+          XCODE_MAJOR="$(xcodebuild -version | awk '/Xcode/ {split($2,v,"."); print v[1]}' | head -n1)"
+          [[ -n "${XCODE_MAJOR}" && "${XCODE_MAJOR}" -ge 17 ]] || {
+            echo "Xcode 17+ is required for notarized release builds." >&2
+            exit 1
+          }
 
       - name: Import signing certificate
         env:
@@ -86,15 +92,17 @@ jobs:
       - name: Build archive
         env:
           ARCHIVE_PATH: ${{ runner.temp }}/GitBird.xcarchive
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
+          [[ -n "${TEAM_ID}" ]] || { echo "Missing APPLE_TEAM_ID repository/org secret." >&2; exit 1; }
           xcodebuild \
             -project GitBird.xcodeproj \
             -scheme GitBird \
             -configuration Release \
             -destination 'generic/platform=macOS' \
             -archivePath "${ARCHIVE_PATH}" \
-            DEVELOPMENT_TEAM=CS727NF72U \
+            DEVELOPMENT_TEAM="${TEAM_ID}" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY='Developer ID Application' \
             PROVISIONING_PROFILE_SPECIFIER="${GITBIRD_PROFILE_NAME}" \
@@ -104,6 +112,7 @@ jobs:
         env:
           ARCHIVE_PATH: ${{ runner.temp }}/GitBird.xcarchive
           EXPORT_PATH: ${{ runner.temp }}/GitBird-export
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           mkdir -p "${EXPORT_PATH}"
@@ -112,7 +121,7 @@ jobs:
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
             <key>method</key><string>developer-id</string>
-            <key>teamID</key><string>CS727NF72U</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
             <key>signingStyle</key><string>manual</string>
             <key>provisioningProfiles</key><dict>
               <key>com.h3p.GitBird</key><string>${GITBIRD_PROFILE_NAME}</string>
@@ -138,11 +147,22 @@ jobs:
           }
           APP="${EXPORT_PATH}/GitBird.app"
           ditto -c -k --keepParent "${APP}" GitBird-submit.zip
-          xcrun notarytool submit GitBird-submit.zip \
+          NOTARY_OUTPUT="$(xcrun notarytool submit GitBird-submit.zip \
             --apple-id "${APPLE_ID}" \
             --team-id "${APPLE_TEAM_ID}" \
             --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
-            --wait
+            --wait)"
+          printf '%s\n' "${NOTARY_OUTPUT}"
+          SUBMISSION_ID="$(printf '%s\n' "${NOTARY_OUTPUT}" | awk '/id:/ {print $2; exit}')"
+          if printf '%s\n' "${NOTARY_OUTPUT}" | grep -q "status: Invalid"; then
+            if [[ -n "${SUBMISSION_ID}" ]]; then
+              xcrun notarytool log "${SUBMISSION_ID}" \
+                --apple-id "${APPLE_ID}" \
+                --team-id "${APPLE_TEAM_ID}" \
+                --password "${APPLE_APP_SPECIFIC_PASSWORD}"
+            fi
+            exit 1
+          fi
           xcrun stapler staple "${APP}"
           xcrun stapler validate "${APP}"
           spctl --assess --type execute --verbose=4 "${APP}"

@@ -28,11 +28,10 @@ struct GitBirdApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        WindowGroup(id: "settings") {
+        Settings {
             SettingView()
                 .environmentObject(RuntimeData.shared)
         }
-        .defaultSize(width: 720, height: 520)
     }
 }
 
@@ -40,8 +39,10 @@ private struct MenuBarLabelView: View {
     @EnvironmentObject private var runtimeData: RuntimeData
 
     var body: some View {
-        let count = runtimeData.notifications.count
-        let hasError = !runtimeData.message.isEmpty
+        let count = runtimeData.notifications.reduce(into: 0) { count, thread in
+            if thread.unread { count += 1 }
+        }
+        let hasError = !runtimeData.errorMessage.isEmpty
 
         HStack(spacing: 4) {
             Image("MenubarIcon")
@@ -59,5 +60,7 @@ private struct MenuBarLabelView: View {
                 Text("!")
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(count > 0 ? "GitBird, \(count) unread notifications" : "GitBird, no unread notifications")
     }
 }

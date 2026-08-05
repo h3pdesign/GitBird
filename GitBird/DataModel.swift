@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Security
 
 
 enum NotificationProvider: String, CaseIterable, Identifiable, Codable, Sendable {
@@ -32,6 +33,62 @@ enum NotificationProvider: String, CaseIterable, Identifiable, Codable, Sendable
         case .gitlab: return URL(string: "https://gitlab.com/dashboard/todos")!
         }
     }
+}
+
+private enum TokenStore {
+    private static let service = Bundle.main.bundleIdentifier ?? "GitBird"
+
+    static func token(for provider: NotificationProvider) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: provider.rawValue,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data,
+              let token = String(data: data, encoding: .utf8),
+              !token.isEmpty else { return nil }
+        return token
+    }
+
+    static func set(_ token: String, for provider: NotificationProvider) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: provider.rawValue
+        ]
+        if token.isEmpty {
+            SecItemDelete(query as CFDictionary)
+            return
+        }
+        let attributes: [String: Any] = [
+            kSecValueData as String: Data(token.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+        ]
+        if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecItemNotFound {
+            var addQuery = query
+            addQuery.merge(attributes) { _, new in new }
+            SecItemAdd(addQuery as CFDictionary, nil)
+        }
+    }
+}
+
+private func validatedGitLabBaseURL(_ value: String) -> URL? {
+    guard var components = URLComponents(string: value.trimmingCharacters(in: .whitespacesAndNewlines)),
+          components.scheme?.lowercased() == "https",
+          let host = components.host,
+          !host.isEmpty,
+          components.path.isEmpty || components.path == "/",
+          components.user == nil,
+          components.password == nil,
+          components.query == nil,
+          components.fragment == nil else { return nil }
+    components.scheme = "https"
+    components.path = ""
+    return components.url
 }
 
 // GitHub REST API: GET /notifications
@@ -147,8 +204,8 @@ enum GitHubNotificationReferrerId {
 
 func fetchNotificationThreads(
     accessToken: String,
-    provider: NotificationProvider? = nil,
-    gitlabBaseURL: URL? = nil,
+    provider: NotificationProvider,
+    gitlabBaseURL: URL?,
     page: Int = 1,
     perPage: Int = 50,
     includeRead: Bool = false
@@ -164,10 +221,9 @@ func fetchNotificationThreads(
         case .invalidResponse:
             AppLog.warning("GitHub API invalid response")
             return ([], false, false, "invalid response")
-        case .httpError(let statusCode, let body):
-            let preview = body.prefix(512)
-            AppLog.warning("GitHub API HTTP \(statusCode), body: \(preview)")
-            return ([], false, false, "bad request: \(statusCode), \(preview)")
+        case .httpError(let statusCode, _):
+            AppLog.warning("Notification API HTTP \(statusCode)")
+            return ([], false, false, "Request failed (HTTP \(statusCode))")
         }
     } catch {
         AppLog.warning("GitHub API request failed (network/firewall?)")
@@ -186,7 +242,7 @@ enum GitHubDate {
     }
 }
 
-struct GitHubAPIClient {
+struct GitHubAPIClient: Sendable {
     enum APIError: Error {
         case invalidResponse
         case httpError(statusCode: Int, body: String)
@@ -196,12 +252,10 @@ struct GitHubAPIClient {
     let provider: NotificationProvider
     let baseURL: URL
 
-    init(token: String, provider: NotificationProvider? = nil, gitlabBaseURL: URL? = nil) {
+    init(token: String, provider: NotificationProvider, gitlabBaseURL: URL?) {
         self.token = token
-        let storedProvider = NotificationProvider(rawValue: UserDefaults.standard.string(forKey: "provider") ?? "") ?? .github
-        let selectedProvider = provider ?? storedProvider
-        self.provider = selectedProvider
-        self.baseURL = selectedProvider == .gitlab ? (gitlabBaseURL ?? selectedProvider.defaultBaseURL) : selectedProvider.defaultBaseURL
+        self.provider = provider
+        self.baseURL = provider == .gitlab ? (gitlabBaseURL ?? provider.defaultBaseURL) : provider.defaultBaseURL
     }
 
     private static let session: URLSession = {
@@ -226,13 +280,16 @@ struct GitHubAPIClient {
     }
 
     func fetch<T: Decodable>(_ url: URL) async throws -> T {
+        guard isAllowedAuthenticatedURL(url) else {
+            throw APIError.invalidResponse
+        }
         let started = Date()
 #if DEBUG
-        AppLog.debug("HTTP GET \(url.absoluteString)")
+        AppLog.debug("HTTP GET request")
 #endif
         let (data, response) = try await Self.session.data(for: makeRequest(url: url))
         guard let http = response as? HTTPURLResponse else {
-            AppLog.warning("HTTP invalid response for \(url.absoluteString)")
+            AppLog.warning("HTTP invalid response")
             throw APIError.invalidResponse
         }
 
@@ -240,15 +297,14 @@ struct GitHubAPIClient {
             let body = String(decoding: data, as: UTF8.self)
 #if DEBUG
             let ms = Int(Date().timeIntervalSince(started) * 1000)
-            let preview = body.prefix(1024)
-            AppLog.debug("HTTP \(http.statusCode) \(url.absoluteString) (\(ms)ms), body: \(preview)")
+            AppLog.debug("HTTP \(http.statusCode) response (\(ms)ms)")
 #endif
             throw APIError.httpError(statusCode: http.statusCode, body: body)
         }
 
 #if DEBUG
         let ms = Int(Date().timeIntervalSince(started) * 1000)
-        AppLog.debug("HTTP 2xx \(url.absoluteString) (\(ms)ms)")
+        AppLog.debug("HTTP 2xx response (\(ms)ms)")
 #endif
 
         let decoder = JSONDecoder()
@@ -269,7 +325,20 @@ struct GitHubAPIClient {
     }
 
     func fetchViewer() async throws -> GitHubUser {
-        try await fetch(URL(string: "https://api.github.com/user")!)
+        guard provider == .github else { throw APIError.invalidResponse }
+        return try await fetch(baseURL.appendingPathComponent("user"))
+    }
+
+    private func isAllowedAuthenticatedURL(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https", let host = url.host?.lowercased() else {
+            return false
+        }
+        switch provider {
+        case .github:
+            return host == "api.github.com"
+        case .gitlab:
+            return host == baseURL.host?.lowercased()
+        }
     }
 
     private func linkHeaderHasNextPage(_ linkHeader: String?) -> Bool {
@@ -293,14 +362,15 @@ struct GitHubAPIClient {
             URLQueryItem(name: "per_page", value: String(min(max(perPage, 1), 50)))
         ]
         let url = components.url!
+        guard isAllowedAuthenticatedURL(url) else { throw APIError.invalidResponse }
 
         let started = Date()
  #if DEBUG
-        AppLog.debug("HTTP GET \(url.absoluteString)")
+        AppLog.debug("HTTP GET request")
  #endif
         let (data, response) = try await Self.session.data(for: makeRequest(url: url))
         guard let http = response as? HTTPURLResponse else {
-            AppLog.warning("HTTP invalid response for \(url.absoluteString)")
+            AppLog.warning("HTTP invalid response")
             throw APIError.invalidResponse
         }
 
@@ -308,15 +378,14 @@ struct GitHubAPIClient {
             let body = String(decoding: data, as: UTF8.self)
  #if DEBUG
             let ms = Int(Date().timeIntervalSince(started) * 1000)
-            let preview = body.prefix(1024)
-            AppLog.debug("HTTP \(http.statusCode) \(url.absoluteString) (\(ms)ms), body: \(preview)")
+            AppLog.debug("HTTP \(http.statusCode) response (\(ms)ms)")
  #endif
             throw APIError.httpError(statusCode: http.statusCode, body: body)
         }
 
  #if DEBUG
         let ms = Int(Date().timeIntervalSince(started) * 1000)
-        AppLog.debug("HTTP 2xx \(url.absoluteString) (\(ms)ms)")
+        AppLog.debug("HTTP 2xx response (\(ms)ms)")
  #endif
 
         var responsePayloads = [data]
@@ -328,6 +397,7 @@ struct GitHubAPIClient {
                 URLQueryItem(name: "per_page", value: String(min(max(perPage, 1), 50)))
             ]
             let doneURL = doneComponents.url!
+            guard isAllowedAuthenticatedURL(doneURL) else { throw APIError.invalidResponse }
             let (doneData, doneResponse) = try await Self.session.data(for: makeRequest(url: doneURL))
             guard let doneHTTP = doneResponse as? HTTPURLResponse, (200...299).contains(doneHTTP.statusCode) else {
                 throw APIError.invalidResponse
@@ -365,9 +435,12 @@ struct GitHubAPIClient {
     }
 
     func markThreadAsRead(url: URL) async throws {
+        guard isAllowedAuthenticatedURL(url) else { throw APIError.invalidResponse }
         var request = makeRequest(url: url)
         if provider == .gitlab {
-            request = makeRequest(url: url.appendingPathComponent("mark_as_done"))
+            let actionURL = url.appendingPathComponent("mark_as_done")
+            guard isAllowedAuthenticatedURL(actionURL) else { throw APIError.invalidResponse }
+            request = makeRequest(url: actionURL)
             request.httpMethod = "POST"
         } else {
             request.httpMethod = "PATCH"
@@ -383,9 +456,12 @@ struct GitHubAPIClient {
     }
 
     func markThreadAsDone(url: URL) async throws {
+        guard isAllowedAuthenticatedURL(url) else { throw APIError.invalidResponse }
         var request = makeRequest(url: url)
         if provider == .gitlab {
-            request = makeRequest(url: url.appendingPathComponent("mark_as_done"))
+            let actionURL = url.appendingPathComponent("mark_as_done")
+            guard isAllowedAuthenticatedURL(actionURL) else { throw APIError.invalidResponse }
+            request = makeRequest(url: actionURL)
             request.httpMethod = "POST"
         } else {
             request.httpMethod = "DELETE"
@@ -402,21 +478,34 @@ struct GitHubAPIClient {
 
     func markAllNotificationsAsDone(urls: [URL]) async throws {
         if provider == .gitlab {
-            var request = makeRequest(url: baseURL.appendingPathComponent("api/v4/todos/mark_as_done"))
+            let actionURL = baseURL.appendingPathComponent("api/v4/todos/mark_as_done")
+            guard isAllowedAuthenticatedURL(actionURL) else { throw APIError.invalidResponse }
+            var request = makeRequest(url: actionURL)
             request.httpMethod = "POST"
             let (_, response) = try await Self.session.data(for: request)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw APIError.invalidResponse }
             return
         }
 
-        for url in urls {
-            try await markThreadAsDone(url: url)
+        var iterator = urls.makeIterator()
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for _ in 0..<4 {
+                guard let url = iterator.next() else { break }
+                group.addTask { try await markThreadAsDone(url: url) }
+            }
+            while try await group.next() != nil {
+                if let url = iterator.next() {
+                    group.addTask { try await markThreadAsDone(url: url) }
+                }
+            }
         }
     }
 
     func markAllNotificationsAsRead(lastReadAt: Date?, urls: [URL] = []) async throws {
         if provider == .gitlab {
-            var request = makeRequest(url: baseURL.appendingPathComponent("api/v4/todos/mark_as_done"))
+            let actionURL = baseURL.appendingPathComponent("api/v4/todos/mark_as_done")
+            guard isAllowedAuthenticatedURL(actionURL) else { throw APIError.invalidResponse }
+            var request = makeRequest(url: actionURL)
             request.httpMethod = "POST"
             let (_, response) = try await Self.session.data(for: request)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw APIError.invalidResponse }
@@ -434,7 +523,9 @@ struct GitHubAPIClient {
             }
         }
 
-        var request = makeRequest(url: baseURL.appendingPathComponent("notifications"))
+        let notificationsURL = baseURL.appendingPathComponent("notifications")
+        guard isAllowedAuthenticatedURL(notificationsURL) else { throw APIError.invalidResponse }
+        var request = makeRequest(url: notificationsURL)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(
@@ -457,6 +548,9 @@ struct GitHubAPIClient {
     }
 
     func fetchSubjectDetails(subjectURL: URL) async -> GitHubSubjectDetails? {
+        guard provider == .github, subjectURL.host?.lowercased() == "api.github.com" else {
+            return nil
+        }
         struct SubjectResource: Codable {
             let htmlUrl: URL?
             let user: GitHubUser?
@@ -486,7 +580,7 @@ struct GitHubAPIClient {
             return GitHubSubjectDetails(htmlUrl: res.htmlUrl, participants: participants)
         } catch {
 #if DEBUG
-            AppLog.debug("Subject details fetch failed: \(subjectURL.absoluteString)")
+            AppLog.debug("Subject details fetch failed")
 #endif
             return nil
         }
@@ -495,7 +589,8 @@ struct GitHubAPIClient {
 
 @MainActor class RuntimeData: ObservableObject {
     static let shared = RuntimeData()
-    @Published var message: String = ""
+    @Published var errorMessage: String = ""
+    @Published var statusMessage: String = ""
     @Published var notifications: [GitHubNotificationThread] = []
     @Published var subjectDetailsByThreadId: [String: GitHubSubjectDetails] = [:]
 
@@ -523,6 +618,7 @@ struct GitHubAPIClient {
         willSet { UserDefaults.standard.set(newValue.rawValue, forKey: "provider") }
         didSet {
             guard provider != oldValue else { return }
+            accessToken = TokenStore.token(for: provider) ?? ""
             resetPaginationState()
             renewPullTask(interval: interval)
         }
@@ -564,13 +660,14 @@ struct GitHubAPIClient {
     private var loadMoreTask: Task<Void, Never>?
     private var tokenDebounceTask: Task<Void, Never>?
     private var viewerFetchTask: Task<Int64?, Never>?
+    private var requestGeneration = 0
     @Published var lastPull: Date?
 
     private var nextNotificationsPage: Int? = nil
     
     @Published var accessToken: String {
         willSet(newValue) {
-            UserDefaults.standard.set(newValue, forKey: "accessToken")
+            TokenStore.set(newValue, for: provider)
         }
         didSet {
             viewerFetchTask?.cancel()
@@ -594,7 +691,14 @@ struct GitHubAPIClient {
         self.hideReadNotifications = defaults.object(forKey: "hideReadNotifications") as? Bool ?? true
         self.provider = NotificationProvider(rawValue: defaults.string(forKey: "provider") ?? "") ?? .github
         self.gitlabBaseURL = defaults.string(forKey: "gitlabBaseURL") ?? "https://gitlab.com"
-        self.accessToken = defaults.string(forKey: "accessToken") ?? defaults.string(forKey: "githubToken") ?? ""
+        let legacyToken = defaults.string(forKey: "accessToken") ?? defaults.string(forKey: "githubToken")
+        let storedToken = TokenStore.token(for: self.provider)
+        if storedToken == nil, let legacyToken {
+            TokenStore.set(legacyToken, for: self.provider)
+        }
+        self.accessToken = storedToken ?? legacyToken ?? ""
+        defaults.removeObject(forKey: "accessToken")
+        defaults.removeObject(forKey: "githubToken")
 
         if self.interval < 30 { self.interval = 300 }
         if self.interval > 3600 { self.interval = 3600 }
@@ -608,6 +712,35 @@ struct GitHubAPIClient {
         min(max(listLength, 1), 50)
     }
 
+    var providerNotificationsURL: URL {
+        guard provider == .gitlab,
+              let baseURL = validatedGitLabBaseURL(gitlabBaseURL) else {
+            return provider.notificationsURL
+        }
+        return baseURL.appendingPathComponent("dashboard/todos")
+    }
+
+    var providerLoginURL: URL {
+        guard provider == .gitlab,
+              let baseURL = validatedGitLabBaseURL(gitlabBaseURL) else {
+            return provider.loginURL
+        }
+        return baseURL.appendingPathComponent("-/user_settings/personal_access_tokens")
+    }
+
+    var allowedAvatarHosts: Set<String> {
+        switch provider {
+        case .github:
+            return ["github.com", "githubusercontent.com"]
+        case .gitlab:
+            var hosts = ["gitlab.com"]
+            if let host = validatedGitLabBaseURL(gitlabBaseURL)?.host?.lowercased() {
+                hosts.append(host)
+            }
+            return Set(hosts)
+        }
+    }
+
     private func resetPaginationState() {
         loadMoreTask?.cancel()
         loadMoreTask = nil
@@ -615,6 +748,13 @@ struct GitHubAPIClient {
         hasMoreNotifications = false
         isLoadingMoreNotifications = false
         loadMoreError = ""
+        isMarkingAllNotificationsAsRead = false
+        isMarkingAllNotificationsAsDone = false
+    }
+
+    private func advanceRequestGeneration() -> Int {
+        requestGeneration &+= 1
+        return requestGeneration
     }
     
     func start() {
@@ -624,7 +764,7 @@ struct GitHubAPIClient {
     
     func refreshNotifications() {
         guard !accessToken.isEmpty else {
-            message = "Set an access token in Account settings!"
+            errorMessage = "Set an access token in Account settings!"
             return
         }
 
@@ -635,16 +775,27 @@ struct GitHubAPIClient {
         detailsTask = nil
         loadMoreTask = nil
         resetPaginationState()
+        let generation = advanceRequestGeneration()
 
         let token = accessToken
+        let provider = provider
+        let gitlabBaseURL = validatedGitLabBaseURL(gitlabBaseURL)
+        guard provider == .github || gitlabBaseURL != nil else {
+            errorMessage = "Enter a valid HTTPS GitLab host."
+            isRefreshing = false
+            return
+        }
         let includeRead = !hideReadNotifications
         let perPage = notificationsPerPage
         isRefreshing = true
-        message = ""
+        errorMessage = ""
+        statusMessage = ""
 
-        pullTask = Task.detached(priority: .userInitiated) { [weak self, token, perPage, includeRead] in
+        pullTask = Task.detached(priority: .userInitiated) { [weak self, token, perPage, includeRead, provider, gitlabBaseURL, generation] in
             let (firstPage, ok, hasNext, err) = await fetchNotificationThreads(
                 accessToken: token,
+                provider: provider,
+                gitlabBaseURL: gitlabBaseURL,
                 page: 1,
                 perPage: perPage,
                 includeRead: includeRead
@@ -654,11 +805,12 @@ struct GitHubAPIClient {
 
             await MainActor.run {
                 guard let self else { return }
+                guard self.requestGeneration == generation else { return }
                 if ok {
                     self.notifications = firstPage
                     self.lastPull = Date()
                 }
-                self.message = err
+                self.errorMessage = ok ? "" : err
                 self.nextNotificationsPage = ok && hasNext ? 2 : nil
                 self.hasMoreNotifications = ok && hasNext
                 self.isLoadingMoreNotifications = false
@@ -668,7 +820,7 @@ struct GitHubAPIClient {
                 let ids = Set(self.notifications.map(\.id))
                 self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { details in ids.contains(details.key) }
                 if ok {
-                    self.prefetchSubjectDetails(for: firstPage)
+                    self.prefetchSubjectDetails(for: Array(firstPage.prefix(12)))
                 }
                 // Manual refresh replaces the polling task. Start it again so
                 // one explicit refresh cannot silently disable background sync.
@@ -685,31 +837,42 @@ struct GitHubAPIClient {
         pullTask = nil
         detailsTask = nil
         loadMoreTask = nil
+        isMarkingAllNotificationsAsRead = false
+        isMarkingAllNotificationsAsDone = false
+        let generation = advanceRequestGeneration()
         
         if interval < 1 {
-            self.message = "Interval is too short"
+            self.errorMessage = "Interval is too short"
             AppLog.warning("Interval too short: \(interval)")
             return
         }
         
         if accessToken.isEmpty {
-            self.message = "Set an access token in Account settings!"
+            self.errorMessage = "Set an access token in Account settings!"
             AppLog.warning("Access token missing")
             return
         }
         
         let token = self.accessToken
+        let provider = self.provider
+        let gitlabBaseURL = validatedGitLabBaseURL(self.gitlabBaseURL)
+        guard provider == .github || gitlabBaseURL != nil else {
+            self.errorMessage = "Enter a valid HTTPS GitLab host."
+            return
+        }
         let includeRead = !hideReadNotifications
         let perPage = notificationsPerPage
 
         ensureViewerUserId()
-        pullTask = Task.detached(priority: .utility) { [weak self, token, perPage, includeRead] in
+        pullTask = Task.detached(priority: .utility) { [weak self, token, perPage, includeRead, provider, gitlabBaseURL, generation] in
             guard let self else { return }
             var failsCount = 0
             repeat {
                 AppLog.debug("Pull notifications (fails=\(failsCount))")
                 let (firstPage, ok, hasNext, err) = await fetchNotificationThreads(
                     accessToken: token,
+                    provider: provider,
+                    gitlabBaseURL: gitlabBaseURL,
                     page: 1,
                     perPage: perPage,
                     includeRead: includeRead
@@ -720,7 +883,8 @@ struct GitHubAPIClient {
                 }
 
                 await MainActor.run {
-                    self.message = err
+                    guard self.requestGeneration == generation else { return }
+                    self.errorMessage = ok ? "" : err
                     if ok {
                         self.notifications = firstPage
                         self.lastPull = Date()
@@ -761,13 +925,18 @@ struct GitHubAPIClient {
         let token = accessToken
         let includeRead = !hideReadNotifications
         let perPage = notificationsPerPage
+        let provider = provider
+        let gitlabBaseURL = validatedGitLabBaseURL(gitlabBaseURL)
+        let generation = requestGeneration
 
         isLoadingMoreNotifications = true
         loadMoreError = ""
 
-        loadMoreTask = Task.detached(priority: .utility) { [token, perPage, page, includeRead] in
+        loadMoreTask = Task.detached(priority: .utility) { [token, perPage, page, includeRead, provider, gitlabBaseURL, generation] in
             let (threads, ok, hasNext, err) = await fetchNotificationThreads(
                 accessToken: token,
+                provider: provider,
+                gitlabBaseURL: gitlabBaseURL,
                 page: page,
                 perPage: perPage,
                 includeRead: includeRead
@@ -778,6 +947,8 @@ struct GitHubAPIClient {
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 defer { self.loadMoreTask = nil }
+
+                guard self.requestGeneration == generation else { return }
 
                 // Ignore stale results when pagination state changed.
                 guard self.nextNotificationsPage == page else {
@@ -814,6 +985,9 @@ struct GitHubAPIClient {
         self.detailsTask?.cancel()
 
         let token = self.accessToken
+        let generation = requestGeneration
+        let provider = self.provider
+        let gitlabBaseURL = validatedGitLabBaseURL(self.gitlabBaseURL)
         var seenURLs = Set<URL>()
         let targets = threads.compactMap { thread -> (String, URL)? in
             guard subjectDetailsByThreadId[thread.id] == nil else { return nil }
@@ -832,7 +1006,7 @@ struct GitHubAPIClient {
 
         self.detailsTask = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
-            let api = GitHubAPIClient(token: token)
+            let api = GitHubAPIClient(token: token, provider: provider, gitlabBaseURL: gitlabBaseURL)
 
             let maxInFlight = 4
             await withTaskGroup(of: (String, GitHubSubjectDetails?).self) { group in
@@ -849,6 +1023,7 @@ struct GitHubAPIClient {
                 while let (id, details) = await group.next() {
                     if let details {
                         await MainActor.run {
+                            guard self.requestGeneration == generation else { return }
                             self.subjectDetailsByThreadId[id] = details
                         }
                     }
@@ -884,19 +1059,26 @@ struct GitHubAPIClient {
 
     func markNotificationAsRead(threadId: String) {
         guard let thread = notifications.first(where: { $0.id == threadId }) else { return }
-        let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: URL(string: gitlabBaseURL))
+        let generation = requestGeneration
+        let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL))
         Task.detached(priority: .utility) { [weak self] in
             do {
                 try await api.markThreadAsRead(url: thread.url)
                 await MainActor.run {
-                    self?.markThreadsAsReadLocally(Set([threadId]))
-                    self?.subjectDetailsByThreadId.removeValue(forKey: threadId)
-                    self?.message = "Marked as read"
+                    guard let self else { return }
+                    guard self.requestGeneration == generation else { return }
+                    self.markThreadsAsReadLocally(Set([threadId]))
+                    if self.hideReadNotifications {
+                        self.notifications.removeAll { $0.id == threadId }
+                    }
+                    self.subjectDetailsByThreadId.removeValue(forKey: threadId)
+                    self.errorMessage = ""
+                    self.statusMessage = self.provider == .gitlab ? "Completed Todo" : "Marked as read"
                 }
             } catch {
                 AppLog.warning("Failed to mark notification as read: \(error)")
                 await MainActor.run {
-                    self?.message = "Failed to mark as read"
+                    self?.errorMessage = "Failed to mark as read"
                 }
             }
         }
@@ -904,20 +1086,22 @@ struct GitHubAPIClient {
 
     func markNotificationAsDone(threadId: String) {
         guard let thread = notifications.first(where: { candidate in candidate.id == threadId }) else { return }
-        let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: URL(string: gitlabBaseURL))
+        let generation = requestGeneration
+        let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL))
         Task.detached(priority: .utility) { [weak self] in
             do {
                 try await api.markThreadAsDone(url: thread.url)
                 await MainActor.run {
-                    self?.notifications.removeAll { candidate in candidate.id == threadId }
-                    self?.subjectDetailsByThreadId.removeValue(forKey: threadId)
-                    self?.message = "Marked as done"
-                    self?.refreshNotifications()
+                    guard let self, self.requestGeneration == generation else { return }
+                    self.notifications.removeAll { candidate in candidate.id == threadId }
+                    self.subjectDetailsByThreadId.removeValue(forKey: threadId)
+                    self.errorMessage = ""
+                    self.statusMessage = "Marked as done"
                 }
             } catch {
                 AppLog.warning("Failed to mark notification as done: \(error)")
                 await MainActor.run {
-                    self?.message = "Failed to mark as done"
+                    self?.errorMessage = "Failed to mark as done"
                 }
             }
         }
@@ -930,24 +1114,24 @@ struct GitHubAPIClient {
 
         let targetIDs = Set(notifications.map(\.id))
         let targetURLs = notifications.map(\.url)
-        let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: URL(string: gitlabBaseURL))
+        let generation = requestGeneration
+        let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL))
         isMarkingAllNotificationsAsDone = true
 
         Task.detached(priority: .utility) { [weak self, targetIDs, targetURLs] in
             do {
                 try await api.markAllNotificationsAsDone(urls: targetURLs)
                 await MainActor.run {
-                    guard let self else { return }
+                    guard let self, self.requestGeneration == generation else { return }
                     self.isMarkingAllNotificationsAsDone = false
                     self.notifications.removeAll { targetIDs.contains($0.id) }
                     self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { !targetIDs.contains($0.key) }
-                    self.refreshNotifications()
                 }
             } catch {
                 AppLog.warning("Failed to mark all notifications as done")
                 await MainActor.run {
                     self?.isMarkingAllNotificationsAsDone = false
-                    self?.message = "Failed to mark all as done"
+                    self?.errorMessage = "Failed to mark all as done"
                 }
             }
         }
@@ -960,7 +1144,8 @@ struct GitHubAPIClient {
 
         let targetIDs = Set(notifications.map(\.id))
         let targetURLs = notifications.map(\.url)
-        let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: URL(string: gitlabBaseURL))
+        let generation = requestGeneration
+        let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL))
         let lastReadAt = lastPull
         isMarkingAllNotificationsAsRead = true
 
@@ -968,15 +1153,22 @@ struct GitHubAPIClient {
             do {
                 try await api.markAllNotificationsAsRead(lastReadAt: lastReadAt, urls: targetURLs)
                 await MainActor.run {
-                    guard let self else { return }
-                    self.markThreadsAsReadLocally(targetIDs)
+                    guard let self, self.requestGeneration == generation else { return }
+                    if self.hideReadNotifications {
+                        self.notifications.removeAll { targetIDs.contains($0.id) }
+                    } else {
+                        self.markThreadsAsReadLocally(targetIDs)
+                    }
+                    self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { !targetIDs.contains($0.key) }
+                    self.errorMessage = ""
+                    self.statusMessage = self.provider == .gitlab ? "Completed Todos" : "Marked all as read"
                     self.isMarkingAllNotificationsAsRead = false
                 }
             } catch {
                 AppLog.warning("Failed to mark all notifications as read: \(error)")
                 await MainActor.run {
                     self?.isMarkingAllNotificationsAsRead = false
-                    self?.message = "Failed to mark all as read"
+                    self?.errorMessage = "Failed to mark all as read"
                 }
             }
         }
@@ -991,6 +1183,7 @@ struct GitHubAPIClient {
     }
 
     private func ensureViewerUserId() {
+        guard provider == .github else { return }
         guard viewerUserId == nil else { return }
         guard viewerFetchTask == nil else { return }
 
@@ -999,7 +1192,7 @@ struct GitHubAPIClient {
 
         let task = Task.detached(priority: .utility) { [token] () async -> Int64? in
             do {
-                let api = GitHubAPIClient(token: token)
+                let api = GitHubAPIClient(token: token, provider: .github, gitlabBaseURL: nil)
                 let viewer = try await api.fetchViewer()
                 guard !Task.isCancelled else { return nil }
                 return viewer.id
@@ -1025,6 +1218,8 @@ struct GitHubAPIClient {
         let token = self.accessToken
         let (_, ok, _, err) = await fetchNotificationThreads(
             accessToken: token,
+            provider: provider,
+            gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL),
             page: 1,
             perPage: 1,
             includeRead: !hideReadNotifications

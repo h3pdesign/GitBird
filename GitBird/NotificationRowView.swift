@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import SwiftUI
 
 struct NotificationRowView: View {
@@ -7,6 +8,8 @@ struct NotificationRowView: View {
     let onOpen: (GitHubNotificationThread, URL) -> Void
     let onMarkAsDone: (GitHubNotificationThread) -> Void
     let onMarkAsRead: (GitHubNotificationThread) -> Void
+    let readActionTitle: String
+    let allowedAvatarHosts: Set<String>
 
     @State private var isHovering = false
 
@@ -82,8 +85,8 @@ struct NotificationRowView: View {
                                 .shadow(color: .green.opacity(0.35), radius: 4, y: 1)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Mark as read")
-                        .help("Mark as read")
+                        .accessibilityLabel(readActionTitle)
+                        .help(readActionTitle)
                         .frame(width: 24, height: 24)
                         .padding(.trailing, 2)
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
@@ -112,7 +115,7 @@ struct NotificationRowView: View {
                 }
 
                 if !participants.isEmpty {
-                    AvatarStackView(users: participants)
+                    AvatarStackView(users: participants, allowedHosts: allowedAvatarHosts)
                 }
         }
         .padding(.vertical, 8)
@@ -133,7 +136,28 @@ struct NotificationRowView: View {
             onOpen(thread, url)
         }
         .focusable()
-        .focusEffectDisabled()
+        .accessibilityLabel("\(thread.repository.fullName): \(thread.subject.title)")
+        .accessibilityHint(url == nil ? "Details unavailable" : "Opens notification in your browser")
+        .accessibilityAction {
+            guard let url else { return }
+            onOpen(thread, url)
+        }
+        .accessibilityAction(named: "Mark as done") {
+            onMarkAsDone(thread)
+        }
+        .accessibilityAction(named: Text(readActionTitle)) {
+            onMarkAsRead(thread)
+        }
+        .onKeyPress(.return) {
+            guard let url else { return .ignored }
+            onOpen(thread, url)
+            return .handled
+        }
+        .onKeyPress(.space) {
+            guard let url else { return .ignored }
+            onOpen(thread, url)
+            return .handled
+        }
         .onDeleteCommand {
 
             onMarkAsDone(thread)
@@ -247,11 +271,12 @@ struct NotificationRowView: View {
 
 struct AvatarStackView: View {
     let users: [GitHubUser]
+    let allowedHosts: Set<String>
 
     var body: some View {
         HStack(spacing: -6) {
             ForEach(users.prefix(5)) { user in
-                AvatarImageView(url: user.avatarUrl)
+                AvatarImageView(url: user.avatarUrl, allowedHosts: allowedHosts)
             }
         }
     }
@@ -259,11 +284,13 @@ struct AvatarStackView: View {
 
 private struct AvatarImageView: View {
     let url: URL
+    let allowedHosts: Set<String>
     @StateObject private var loader: AvatarImageLoader
 
-    init(url: URL) {
+    init(url: URL, allowedHosts: Set<String>) {
         self.url = url
-        _loader = StateObject(wrappedValue: AvatarImageLoader(url: url))
+        self.allowedHosts = allowedHosts
+        _loader = StateObject(wrappedValue: AvatarImageLoader(url: url, allowedHosts: allowedHosts))
     }
 
     var body: some View {
@@ -293,6 +320,7 @@ private struct AvatarImageView: View {
 private final class AvatarImageLoader: ObservableObject {
     @Published var image: NSImage?
     private let url: URL
+    private let allowedHosts: Set<String>
     private var task: Task<Data?, Never>?
 
     private static let cache: NSCache<NSURL, NSImage> = {
@@ -310,8 +338,9 @@ private final class AvatarImageLoader: ObservableObject {
         return URLSession(configuration: config)
     }()
 
-    init(url: URL) {
+    init(url: URL, allowedHosts: Set<String>) {
         self.url = url
+        self.allowedHosts = allowedHosts
     }
 
     deinit {
@@ -319,6 +348,11 @@ private final class AvatarImageLoader: ObservableObject {
     }
 
     func load() async {
+        guard url.scheme?.lowercased() == "https",
+              let host = url.host?.lowercased(),
+              allowedHosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") }),
+              url.user == nil,
+              url.password == nil else { return }
         if image != nil { return }
         if let cached = Self.cache.object(forKey: url as NSURL) {
             image = cached
@@ -330,8 +364,9 @@ private final class AvatarImageLoader: ObservableObject {
         task = Task.detached(priority: .utility) {
             do {
                 let (data, response) = try await Self.session.data(from: url)
-                guard !Task.isCancelled else { return nil }
-                guard (response as? HTTPURLResponse).map({ (200...299).contains($0.statusCode) }) ?? false else { return nil }
+                guard !Task.isCancelled,
+                      data.count <= 2_000_000,
+                      (response as? HTTPURLResponse).map({ (200...299).contains($0.statusCode) }) ?? false else { return nil }
                 return data
             } catch {
                 return nil
@@ -340,8 +375,19 @@ private final class AvatarImageLoader: ObservableObject {
 
         let data = await task?.value
         task = nil
-        guard let data, let img = NSImage(data: data) else { return }
-        Self.cache.setObject(img, forKey: url as NSURL)
-        image = img
+        guard let data,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let cgImage = CGImageSourceCreateThumbnailAtIndex(
+                  source,
+                  0,
+                  [
+                      kCGImageSourceCreateThumbnailFromImageAlways: true,
+                      kCGImageSourceCreateThumbnailWithTransform: true,
+                      kCGImageSourceThumbnailMaxPixelSize: 72
+                  ] as CFDictionary
+              ) else { return }
+        let loadedImage = NSImage(cgImage: cgImage, size: NSSize(width: 36, height: 36))
+        Self.cache.setObject(loadedImage, forKey: url as NSURL)
+        image = loadedImage
     }
 }
