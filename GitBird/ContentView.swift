@@ -13,7 +13,7 @@ struct ContentView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
-     
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
@@ -24,17 +24,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(MenuBarWindowSurface())
         .frame(width: 420)
-        .task(id: prefetchKey) {
-            guard runtimeData.errorMessage.isEmpty else { return }
-            guard !runtimeData.notifications.isEmpty else { return }
-            // Details are only needed for the first visible rows. Deferring the
-            // rest avoids a burst of subject requests when a large inbox loads.
-            runtimeData.prefetchSubjectDetails(for: Array(runtimeData.notifications.prefix(12)))
-        }
-    }
-
-    private var prefetchKey: String {
-        "\(runtimeData.notifications.count)-\(runtimeData.notifications.first?.id ?? "")-\(runtimeData.notifications.last?.id ?? "")"
     }
 
     private struct NotificationGroup: Identifiable {

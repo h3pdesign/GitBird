@@ -661,6 +661,7 @@ struct GitHubAPIClient: Sendable {
     private var tokenDebounceTask: Task<Void, Never>?
     private var viewerFetchTask: Task<Int64?, Never>?
     private var requestGeneration = 0
+    private var actionTaskIDs = Set<String>()
     @Published var lastPull: Date?
 
     private var nextNotificationsPage: Int? = nil
@@ -757,6 +758,14 @@ struct GitHubAPIClient: Sendable {
         requestGeneration &+= 1
         return requestGeneration
     }
+
+    private func notificationsDiffer(_ lhs: [GitHubNotificationThread], _ rhs: [GitHubNotificationThread]) -> Bool {
+        guard lhs.count == rhs.count else { return true }
+        return zip(lhs, rhs).contains { old, new in
+            old.id != new.id || old.unread != new.unread || old.updatedAt != new.updatedAt ||
+            old.subject.title != new.subject.title || old.subject.type != new.subject.type || old.reason != new.reason
+        }
+    }
     
     func start() {
         AppLog.info("RuntimeData start")
@@ -808,7 +817,9 @@ struct GitHubAPIClient: Sendable {
                 guard let self else { return }
                 guard self.requestGeneration == generation else { return }
                 if ok {
-                    self.notifications = firstPage
+                    if self.notificationsDiffer(self.notifications, firstPage) {
+                        self.notifications = firstPage
+                    }
                     self.lastPull = Date()
                 }
                 self.errorMessage = ok ? "" : err
@@ -865,8 +876,7 @@ struct GitHubAPIClient: Sendable {
         let perPage = notificationsPerPage
 
         ensureViewerUserId()
-        pullTask = Task.detached(priority: .utility) { [weak self, token, perPage, includeRead, provider, gitlabBaseURL, generation] in
-            guard let self else { return }
+        pullTask = Task.detached(priority: .utility) { [token, perPage, includeRead, provider, gitlabBaseURL, generation] in
             var failsCount = 0
             repeat {
                 AppLog.debug("Pull notifications (fails=\(failsCount))")
@@ -883,21 +893,31 @@ struct GitHubAPIClient: Sendable {
                     AppLog.warning("Pull notifications failed: \(err)")
                 }
 
-                await MainActor.run {
-                    guard self.requestGeneration == generation else { return }
+                let shouldContinue = await MainActor.run { [weak self] in
+                    guard let self, self.requestGeneration == generation else { return false }
                     self.errorMessage = ok ? "" : err
                     if ok {
-                        self.notifications = firstPage
+                        let changed = self.notificationsDiffer(self.notifications, firstPage)
+                        if changed {
+                            self.notifications = firstPage
+                        }
                         self.lastPull = Date()
                         self.nextNotificationsPage = hasNext ? 2 : nil
                         self.hasMoreNotifications = self.nextNotificationsPage != nil
                         self.isLoadingMoreNotifications = false
                         self.loadMoreError = ""
 
-                        let ids = Set(firstPage.map { $0.id })
-                        self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { ids.contains($0.key) }
+                        if changed {
+                            let ids = Set(firstPage.map { $0.id })
+                            self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { ids.contains($0.key) }
+                            self.prefetchSubjectDetails(for: Array(firstPage.prefix(12)))
+                        }
                     }
+                    return true
                 }
+
+                guard shouldContinue else { return }
+
                 
                 if ok {
                     failsCount = 0
@@ -1005,37 +1025,30 @@ struct GitHubAPIClient: Sendable {
         AppLog.debug("Prefetch subject details: \(targets.count) targets")
 #endif
 
-        self.detailsTask = Task.detached(priority: .utility) { [weak self] in
-            guard let self else { return }
+        self.detailsTask = Task.detached(priority: .utility) {
             let api = GitHubAPIClient(token: token, provider: provider, gitlabBaseURL: gitlabBaseURL)
+            var fetchedDetails: [String: GitHubSubjectDetails] = [:]
 
-            let maxInFlight = 4
             await withTaskGroup(of: (String, GitHubSubjectDetails?).self) { group in
                 var it = targets.makeIterator()
-
-                for _ in 0..<maxInFlight {
+                for _ in 0..<4 {
                     guard let (id, url) = it.next() else { break }
-                    group.addTask {
-                        let details = await api.fetchSubjectDetails(subjectURL: url)
-                        return (id, details)
-                    }
+                    group.addTask { (id, await api.fetchSubjectDetails(subjectURL: url)) }
                 }
-
                 while let (id, details) = await group.next() {
-                    if let details {
-                        await MainActor.run {
-                            guard self.requestGeneration == generation else { return }
-                            self.subjectDetailsByThreadId[id] = details
-                        }
-                    }
-
+                    if let details { fetchedDetails[id] = details }
                     if let (nextId, nextURL) = it.next() {
-                        group.addTask {
-                            let details = await api.fetchSubjectDetails(subjectURL: nextURL)
-                            return (nextId, details)
-                        }
+                        group.addTask { (nextId, await api.fetchSubjectDetails(subjectURL: nextURL)) }
                     }
                 }
+            }
+
+            guard !Task.isCancelled, !fetchedDetails.isEmpty else { return }
+            await MainActor.run { [weak self] in
+                guard let self, self.requestGeneration == generation else { return }
+                var merged = self.subjectDetailsByThreadId
+                for (id, details) in fetchedDetails { merged[id] = details }
+                self.subjectDetailsByThreadId = merged
             }
         }
     }
@@ -1060,6 +1073,7 @@ struct GitHubAPIClient: Sendable {
 
     func markNotificationAsRead(threadId: String) {
         guard let thread = notifications.first(where: { $0.id == threadId }) else { return }
+        guard actionTaskIDs.insert(threadId).inserted else { return }
         let generation = requestGeneration
         let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL))
         Task.detached(priority: .utility) { [weak self] in
@@ -1067,6 +1081,7 @@ struct GitHubAPIClient: Sendable {
                 try await api.markThreadAsRead(url: thread.url)
                 await MainActor.run {
                     guard let self else { return }
+                    self.actionTaskIDs.remove(threadId)
                     guard self.requestGeneration == generation else { return }
                     self.markThreadsAsReadLocally(Set([threadId]))
                     if self.hideReadNotifications {
@@ -1079,6 +1094,7 @@ struct GitHubAPIClient: Sendable {
             } catch {
                 AppLog.warning("Failed to mark notification as read: \(error)")
                 await MainActor.run {
+                    self?.actionTaskIDs.remove(threadId)
                     self?.errorMessage = "Failed to mark as read"
                 }
             }
@@ -1087,13 +1103,16 @@ struct GitHubAPIClient: Sendable {
 
     func markNotificationAsDone(threadId: String) {
         guard let thread = notifications.first(where: { candidate in candidate.id == threadId }) else { return }
+        guard actionTaskIDs.insert(threadId).inserted else { return }
         let generation = requestGeneration
         let api = GitHubAPIClient(token: accessToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL))
         Task.detached(priority: .utility) { [weak self] in
             do {
                 try await api.markThreadAsDone(url: thread.url)
                 await MainActor.run {
-                    guard let self, self.requestGeneration == generation else { return }
+                    guard let self else { return }
+                    self.actionTaskIDs.remove(threadId)
+                    guard self.requestGeneration == generation else { return }
                     self.notifications.removeAll { candidate in candidate.id == threadId }
                     self.subjectDetailsByThreadId.removeValue(forKey: threadId)
                     self.errorMessage = ""
@@ -1102,6 +1121,7 @@ struct GitHubAPIClient: Sendable {
             } catch {
                 AppLog.warning("Failed to mark notification as done: \(error)")
                 await MainActor.run {
+                    self?.actionTaskIDs.remove(threadId)
                     self?.errorMessage = "Failed to mark as done"
                 }
             }

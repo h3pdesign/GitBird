@@ -321,7 +321,7 @@ private final class AvatarImageLoader: ObservableObject {
     @Published var image: NSImage?
     private let url: URL
     private let allowedHosts: Set<String>
-    private var task: Task<Data?, Never>?
+    private static var inFlight: [URL: Task<Data?, Never>] = [:]
 
     private static let cache: NSCache<NSURL, NSImage> = {
         let c = NSCache<NSURL, NSImage>()
@@ -343,9 +343,6 @@ private final class AvatarImageLoader: ObservableObject {
         self.allowedHosts = allowedHosts
     }
 
-    deinit {
-        task?.cancel()
-    }
 
     func load() async {
         guard url.scheme?.lowercased() == "https",
@@ -359,33 +356,39 @@ private final class AvatarImageLoader: ObservableObject {
             return
         }
 
-        if task != nil { return }
         let url = self.url
-        task = Task.detached(priority: .utility) {
-            do {
-                let (data, response) = try await Self.session.data(from: url)
-                guard !Task.isCancelled,
-                      data.count <= 2_000_000,
-                      (response as? HTTPURLResponse).map({ (200...299).contains($0.statusCode) }) ?? false else { return nil }
-                return data
-            } catch {
-                return nil
+        let data: Data?
+        if let existing = Self.inFlight[url] {
+            data = await existing.value
+        } else {
+            let requestTask: Task<Data?, Never> = Task.detached(priority: .utility) {
+                do {
+                    let (data, response) = try await Self.session.data(from: url)
+                    guard !Task.isCancelled, data.count <= 2_000_000,
+                          (response as? HTTPURLResponse).map({ (200...299).contains($0.statusCode) }) ?? false else { return nil }
+                    return data
+                } catch {
+                    return nil
+                }
             }
+            Self.inFlight[url] = requestTask
+            data = await requestTask.value
+            Self.inFlight[url] = nil
         }
-
-        let data = await task?.value
-        task = nil
-        guard let data,
-              let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let cgImage = CGImageSourceCreateThumbnailAtIndex(
-                  source,
-                  0,
-                  [
-                      kCGImageSourceCreateThumbnailFromImageAlways: true,
-                      kCGImageSourceCreateThumbnailWithTransform: true,
-                      kCGImageSourceThumbnailMaxPixelSize: 72
-                  ] as CFDictionary
-              ) else { return }
+        guard let data else { return }
+        let cgImage: CGImage? = await Task.detached(priority: .utility) {
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+            return CGImageSourceCreateThumbnailAtIndex(
+                source,
+                0,
+                [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 72
+                ] as CFDictionary
+            )
+        }.value
+        guard let cgImage else { return }
         let loadedImage = NSImage(cgImage: cgImage, size: NSSize(width: 36, height: 36))
         Self.cache.setObject(loadedImage, forKey: url as NSURL)
         image = loadedImage

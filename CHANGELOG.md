@@ -2,6 +2,16 @@
 
 All notable changes to GitBird are documented here.
 
+## [2.1.5] - 2026-08-10
+
+### Performance and reliability
+
+- Avoid unnecessary SwiftUI list updates when polling returns unchanged notifications.
+- Batch subject-detail prefetch updates and keep polling task lifetimes non-retaining.
+- Deduplicate in-flight avatar downloads and decode thumbnails off the main actor.
+- Prevent duplicate read/done requests for the same notification.
+- Clarify Swift 6 task result types for reliable release builds.
+
 ## [2.1.4] - 2026-08-05
 
 ### Security and reliability
