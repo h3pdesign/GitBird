@@ -23,7 +23,7 @@ Impact is limited to GitBird’s macOS app, hosted tests, configuration, and doc
 - Menu bar labels identify loaded unread items and append `+` when more pages exist.
 - Optional launch at login using `SMAppService.mainApp`, with approval guidance and service-status/error handling.
 - Bulk confirmations explain that GitHub done affects loaded items including search-hidden items, GitHub read covers account items up to the last refresh, and GitLab completion covers every pending Todo including unloaded items.
-- Hosted regression tests and a pull-request/main-push build/test workflow. The workflow is local and has not run on GitHub yet.
+- Hosted regression tests and a pull-request/main-push build/test workflow. The workflow passed on GitHub for the v2.1.6 source commit.
 
 Keep GitBird’s focused menu bar workflow. Further expansion into a full Git client would increase scope without improving this core use case.
 
@@ -35,7 +35,7 @@ Proposed product ID: `com.h3p.GitBird.support.tip`. The local StoreKit fixture u
 
 ## Verification results
 
-- **Verification Level: 1.** Shared cross-platform code changed: **No**. Platforms affected: **macOS only**. No iOS/iPadOS target exists, and no cross-platform issue was found.
+- **Verification Level: 3** for GitHub release delivery (implementation verification used Level 1). Shared cross-platform code changed: **No**. Platforms affected: **macOS only**. No iOS/iPadOS target exists, and no cross-platform issue was found.
 - Xcode 27.0 on macOS 27.0.1: optimized Release build succeeded with Swift 6 complete strict-concurrency checking. No Swift compiler warnings; App Intents metadata extraction reported no framework dependency.
 - 21 hosted tests pass: 16 reliability tests and five support tests, including two distinct repeatable local StoreKit purchases and transaction finishing. The StoreKit test also passed ten consecutive repetitions after the harness isolated the debug app’s background services, exercised its own transaction listener, and gated overlapping purchase attempts deterministically. Cancellation/pending/error and concurrency branches use injected purchase results. Subsequent real Ask-to-Buy approval and crash-relaunch unfinished recovery have not been exercised.
 - The sandbox-enabled ad-hoc test run passed all 14 reliability tests then present and four support tests; the local StoreKit product lookup returned no product. Full StoreKit verification uses an isolated bundle ID and command-only ad-hoc signing, hardened-runtime, and sandbox overrides. Production project sandbox and hardened-runtime settings remain enabled. These tests do not prove shipping signature/Keychain access or App Store sandbox behavior.
@@ -46,6 +46,12 @@ Evidence: `/tmp/GitBird-improvements-results.xcresult`, `/tmp/gitbird-improvemen
 
 The CI runner choice matches [GitHub’s supported macOS runner images](https://github.com/actions/runner-images/blob/main/README.md). StoreKit transaction finishing follows [Apple’s unfinished-transaction contract](https://developer.apple.com/documentation/storekit/transaction/unfinished); tests assert the queue settles without manually finishing transactions in the assertion.
 
-## Remaining release checks
+## Published GitHub release
 
-Authenticate App Store Connect and complete the consumable setup, run a signed sandbox/TestFlight purchase with local StoreKit configuration disabled, validate accessibility and login items on supported Macs (including macOS 14.6), run the committed workflow remotely, then follow the existing signed release process. GitHub release preparation targets v2.1.6 (build 187). Publication evidence is available on the release page and associated workflow runs. App Review submission and live consumable provisioning remain pending.
+[GitBird v2.1.6](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.6), build 187, is published as the latest stable release. [Remote CI](https://github.com/h3pdesign/GitBird/actions/runs/36661232258) passed the Release build and all 21 tests using Xcode 26.6. The [release workflow](https://github.com/h3pdesign/GitBird/actions/runs/36661475728) succeeded.
+
+The downloaded universal (arm64/x86_64) archive passed its published checksum, strict code signature verification, stapled-ticket validation, and Gatekeeper assessment as Notarized Developer ID. The app reports version 2.1.6, build 187, minimum macOS 14.6, and hardened runtime. Archive SHA-256: `50380ca01b1a55e5f5fb2a3ca7bc8cc49afc457e4e02b0bebc6a86117271ab45`.
+
+## Remaining App Store and runtime checks
+
+Authenticate App Store Connect and complete the consumable setup, run a signed sandbox/TestFlight purchase with local StoreKit configuration disabled, and validate accessibility and login items on supported Macs (including macOS 14.6). App Review submission and live consumable provisioning remain pending.

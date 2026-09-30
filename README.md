@@ -34,7 +34,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release 
 
 ## Install
 
-Download the latest signed build from [Releases](https://github.com/h3pdesign/GitBird/releases), move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon.
+Download [GitBird 2.1.6](https://github.com/h3pdesign/GitBird/releases/download/v2.1.6/GitBird-2.1.6.zip), unzip it, move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon. The universal download supports Apple Silicon and Intel, is Developer ID signed, notarized, and stapled, and requires macOS 14.6+. Check the archive against [SHA256SUMS.txt](https://github.com/h3pdesign/GitBird/releases/download/v2.1.6/SHA256SUMS.txt).
 
 ## Configure GitHub
 
@@ -104,7 +104,7 @@ xcodebuild -project GitBird.xcodeproj -scheme GitBird \
   ENABLE_HARDENED_RUNTIME=NO ENABLE_APP_SANDBOX=NO test
 ```
 
-The command above isolates test credentials and uses test-only signing/runtime overrides for local StoreKit. Shipping settings retain App Sandbox and hardened runtime. `.github/workflows/ci.yml` builds Release and runs these tests on pull requests and main-branch pushes; CI verifies source builds and local purchase behavior. The GitHub release workflow separately signs, notarizes, staples, and verifies the downloadable app. Signed App Store purchase validation remains a separate requirement before enabling live tips.
+The command above isolates test credentials and uses test-only signing/runtime overrides for local StoreKit. Shipping settings retain App Sandbox and hardened runtime. `.github/workflows/ci.yml` builds Release and runs these tests on pull requests and main-branch pushes; The [2.1.6 CI run](https://github.com/h3pdesign/GitBird/actions/runs/36661232258) passed its Release build and all 21 tests. CI verifies source builds and local purchase behavior. The [2.1.6 release workflow](https://github.com/h3pdesign/GitBird/actions/runs/36661475728) signed, notarized, stapled, and verified the downloadable app. The uploaded archive also passed checksum, signature, stapling, and Gatekeeper checks after download. Signed App Store purchase validation remains a separate requirement before enabling live tips.
 
 See [REVIEW.md](./REVIEW.md) for findings, fixes, evidence, and remaining release checks.
 
