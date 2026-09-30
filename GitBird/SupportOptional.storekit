@@ -1,0 +1,42 @@
+{
+  "identifier": "40A3172B-7F56-4FCA-B4EE-1B1C507F7E9E",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "7FF29354-2D04-46E7-9870-9F728B366504",
+      "localizations": [
+        {
+          "description": "Optional consumable support tip for GitBird. Can be purchased multiple times. No features are locked.",
+          "displayName": "Support Tip for GitBird",
+          "locale": "en_US"
+        },
+        {
+          "description": "Optionaler verbrauchbarer Support-Tipp fuer GitBird. Kann mehrfach gekauft werden. Keine Funktionen sind gesperrt.",
+          "displayName": "Support-Tipp fuer GitBird",
+          "locale": "de_DE"
+        }
+      ],
+      "productID": "com.h3p.GitBird.support.tip",
+      "referenceName": "Optional Support Tip",
+      "type": "Consumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "40A3172B-7F56-4FCA-B4EE-1B1C507F7E9E",
+    "_developerTeamID": "",
+    "_disableDialogs": false,
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 0,
+    "_locale": "de_DE",
+    "_renewalBillingIssuesEnabled": false,
+    "_storefront": "DEU",
+    "_timeRate": 0
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

@@ -5,6 +5,7 @@
 
 import AppKit
 import SwiftUI
+import ServiceManagement
 
 private enum AppVersion {
     static func formatted(versionPrefix: String, buildPrefix: String) -> String {
@@ -27,6 +28,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case token
     case about
+    case support
 
     var id: String { rawValue }
 
@@ -34,6 +36,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "General"
         case .token: return "Account"
+        case .support: return "Support"
         case .about: return "About"
         }
     }
@@ -42,6 +45,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gearshape"
         case .token: return "key.horizontal"
+        case .support: return "heart"
         case .about: return "info.circle"
         }
     }
@@ -49,7 +53,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
 struct SettingView: View {
     @EnvironmentObject private var runtimeData: RuntimeData
-    @State private var selection: SettingsSection = .general
+    @AppStorage("settingsSection") private var selection: SettingsSection = .general
 
     var body: some View {
         NavigationSplitView {
@@ -81,6 +85,8 @@ struct SettingView: View {
                 case .token:
                     TokenSettingsView()
                         .environmentObject(runtimeData)
+                case .support:
+                    SupportSettingsView()
                 case .about:
                     AboutSettingsView()
                 }
@@ -114,6 +120,23 @@ struct SettingView: View {
 private struct GeneralSettingsView: View {
     @EnvironmentObject private var runtimeData: RuntimeData
 
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var loginStatus = SMAppService.mainApp.status
+    @State private var loginError: String?
+
+    private var launchAtLogin: Binding<Bool> {
+        Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval }, set: { enabled in
+            do {
+                if enabled { try SMAppService.mainApp.register() }
+                else { try SMAppService.mainApp.unregister() }
+                loginError = nil
+            } catch {
+                loginError = "Couldn’t change launch at login. Check Login Items in System Settings."
+            }
+            loginStatus = SMAppService.mainApp.status
+        })
+    }
+
     private var listLengthBinding: Binding<Int> {
         Binding(
             get: { runtimeData.listLength },
@@ -131,6 +154,16 @@ private struct GeneralSettingsView: View {
     var body: some View {
         ScrollView {
             Form {
+                Section("Startup") {
+                    Toggle("Launch GitBird at login", isOn: launchAtLogin)
+                        .help("Start GitBird automatically when you sign in to your Mac")
+                    if loginStatus == .requiresApproval {
+                        Text("Allow GitBird under Login Items in System Settings to finish enabling startup.")
+                            .foregroundStyle(.secondary)
+                        Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }
+                    }
+                    if let loginError { Text(loginError).foregroundStyle(.secondary) }
+                }
                 Section {
                     LabeledContent("Items per page") {
                         HStack(spacing: 10) {
@@ -183,11 +216,16 @@ private struct GeneralSettingsView: View {
             .padding(20)
         }
         .navigationTitle("General")
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { loginStatus = SMAppService.mainApp.status }
+        }
     }
 }
 
 private struct TokenSettingsView: View {
     @EnvironmentObject private var runtimeData: RuntimeData
+    @State private var showRemoveToken = false
+    @State private var hostDraft = ""
     @State private var tokenChecking = false
     @State private var showTokenAlert = false
     @State private var tokenAlertTitle = ""
@@ -205,23 +243,35 @@ private struct TokenSettingsView: View {
                     .pickerStyle(.segmented)
 
                     if runtimeData.provider == .gitlab {
-                        TextField("GitLab host", text: $runtimeData.gitlabBaseURL)
-                            .textContentType(.URL)
-                            .help("Use an HTTPS host such as https://gitlab.com; paths, queries, and fragments are not allowed.")
+                        HStack {
+                            TextField("GitLab host", text: $hostDraft)
+                                .textContentType(.URL)
+                                .onSubmit { applyHost() }
+                            Button("Use host", action: applyHost)
+                                .disabled(validatedGitLabBaseURL(hostDraft) == nil || tokenChecking)
+                        }
+                        Text("Use an HTTPS origin such as https://gitlab.com. Tokens are saved separately for each host.")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
 
-                    SecureField(runtimeData.provider == .github ? "Personal access token" : "Personal access token", text: $runtimeData.accessToken)
+                    SecureField("Personal access token", text: $runtimeData.accessToken)
                         .textContentType(.password)
-                        .disabled(tokenChecking)
+                        .disabled(tokenChecking || runtimeData.isLoadingCredentials)
+
+                    if runtimeData.isLoadingCredentials { ProgressView("Loading saved token…") }
+                    if !runtimeData.credentialError.isEmpty {
+                        Text(runtimeData.credentialError).foregroundStyle(.secondary)
+                        Button("Retry Keychain") { Task { await runtimeData.loadCredentials(requireVerification: runtimeData.accountNeedsVerification) } }
+                    }
 
                     HStack(spacing: 10) {
-                        Button("Verify token") {
+                        Button("Verify and save token") {
                             tokenChecking = true
                             Task {
                                 let (ok, err) = await runtimeData.testAccessToken()
                                 tokenChecking = false
                                 showTokenAlert = true
-                                tokenAlertTitle = ok ? "Token verified" : "Access token verification failed"
+                                tokenAlertTitle = ok ? "Token verified and saved" : "Access token verification failed"
                                 tokenAlertContent = err
 
                                 if ok {
@@ -231,7 +281,10 @@ private struct TokenSettingsView: View {
                                 }
                             }
                         }
-                        .disabled(tokenChecking)
+                        .disabled(tokenChecking || runtimeData.isLoadingCredentials || runtimeData.accessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                        Button("Remove saved token", role: .destructive) { showRemoveToken = true }
+                            .disabled(tokenChecking || runtimeData.isLoadingCredentials)
 
                         if tokenChecking {
                             ProgressView()
@@ -244,7 +297,8 @@ private struct TokenSettingsView: View {
                 } header: {
                     Text("Access Token")
                 } footer: {
-                    Text(runtimeData.provider == .github ? "GitHub notifications and read state use the GitHub API." : "GitLab Todos are used as notifications; marking read completes the Todo on GitLab.")
+                    Text("Tokens are activated and saved to Keychain only after verification succeeds. Editing the field does not replace the active token.")
+                    Text(runtimeData.provider == .github ? "GitHub notifications need a classic token with the notifications scope, plus repo access for private repositories. Fine-grained personal access tokens do not support this endpoint." : "GitLab Todos need a token with api scope. Read and done both complete the Todo on GitLab.")
                 }
 
                 Section("Help") {
@@ -256,6 +310,19 @@ private struct TokenSettingsView: View {
             .padding(20)
         }
         .navigationTitle("Account")
+        .confirmationDialog("Remove this account’s saved token?", isPresented: $showRemoveToken, titleVisibility: .visible) {
+            Button("Remove saved token", role: .destructive) { Task { await runtimeData.removeAccessToken() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("GitBird will stop using this account until you verify and save a token again. Tokens for other hosts are kept.")
+        }
+        .task { hostDraft = runtimeData.gitlabBaseURL }
+        .onChange(of: runtimeData.gitlabBaseURL) { _, value in hostDraft = value }
+    }
+
+    private func applyHost() {
+        guard let host = validatedGitLabBaseURL(hostDraft) else { return }
+        runtimeData.gitlabBaseURL = host.absoluteString
     }
 }
 
@@ -388,4 +455,97 @@ private struct SettingsAppIconView: View {
 #Preview {
     SettingView()
         .environmentObject(RuntimeData())
+        .environment(SupportPurchaseManager())
+}
+
+private struct SupportSettingsView: View {
+    @Environment(SupportPurchaseManager.self) private var support
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        ScrollView {
+            Form {
+                Section {
+                    Text("Support GitBird")
+                        .font(.headline)
+                    Text("Help keep GitBird fast, simple, and maintained.")
+                        .foregroundStyle(.secondary)
+                    Text("Support is optional. All features remain available without a purchase.")
+                    Text("A consumable tip you can send multiple times. No subscription or automatic renewal.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    LabeledContent("App Store Price") {
+                        if support.isLoading && support.product == nil {
+                            ProgressView("Loading price…")
+                                .controlSize(.small)
+                        } else {
+                            Text(support.product?.displayPrice ?? "Unavailable")
+                                .monospacedDigit()
+                        }
+                    }
+
+                    Button(support.purchaseTitle) {
+                        Task { await support.purchase() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!support.canPurchase)
+                    .accessibilityLabel("Send Support Tip")
+                    .accessibilityValue(support.product?.displayPrice ?? "Unavailable")
+                    .help("Send an optional, one-time tip through the App Store")
+
+                    if support.hasCheckedAvailability && !support.canMakePayments {
+                        Text("In-App Purchases are unavailable. Check your App Store account and payment restrictions.")
+                            .foregroundStyle(.secondary)
+                    }
+                    if support.hasCheckedAvailability && support.product == nil && !support.isLoading {
+                        Text("The App Store support tip is currently unavailable. All GitBird features remain available.")
+                            .foregroundStyle(.secondary)
+                        Button("Retry App Store") {
+                            support.statusMessage = nil
+                            Task { await support.refresh() }
+                        }
+                        .disabled(support.isPurchasing)
+                    }
+                    if let message = support.statusMessage {
+                        Text(message)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textSelection(.enabled)
+                            .accessibilityLabel("Purchase status: \(message)")
+                    }
+                } header: {
+                    Text("Support Development")
+                }
+
+                Section("More ways to support") {
+                    if let url = URL(string: "https://www.patreon.com/h3p") {
+                        Link(destination: url) {
+                            Label("Support via Patreon", systemImage: "safari")
+                        }
+                    }
+                    if let url = URL(string: "https://github.com/h3pdesign/GitBird") {
+                        Link(destination: url) {
+                            Label("Star on GitHub", systemImage: "star")
+                        }
+                    }
+                }
+
+                Section("Help and feedback") {
+                    if let url = URL(string: "https://github.com/h3pdesign/GitBird/issues") {
+                        Link(destination: url) {
+                            Label("Report an issue or request a feature", systemImage: "exclamationmark.bubble")
+                        }
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .padding(20)
+        }
+        .navigationTitle("Support")
+        .task { await support.refresh() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await support.refresh() } }
+        }
+    }
 }

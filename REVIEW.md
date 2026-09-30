@@ -1,0 +1,51 @@
+# GitBird review and implementation — 2026-09-30
+
+This review covered settings, credentials, authenticated provider requests, polling and pagination, notification actions, startup, support purchases, and build configuration. The seven original findings and the six product recommendations are implemented locally. App Store provisioning and runtime accessibility validation remain open; these release checks are separate from the notarized GitHub distribution.
+
+## Findings and fixes
+
+| Finding / root cause | Change and restored invariant | Evidence |
+| --- | --- | --- |
+| Keychain update/add/delete statuses were discarded, and migration deleted plaintext even if storage failed. | Security statuses are checked; missing credentials differ from denied reads. Migration sources survive failed writes and remain pinned to their original provider and GitLab origin across restarts. Drafts activate only after provider verification and secure storage succeed. Explicit removal reports failed deletes. | `TokenStore`, `RuntimeData.loadCredentials`, `testAccessToken`, `removeAccessToken`; fake-storage tests cover denied reads/writes/deletes, successful migration, retry, and restart ownership. |
+| GitLab tokens used a provider-only Keychain account, and changing host reused the same token. Redirects lacked an explicit authenticated origin policy. | GitLab credentials use a normalized HTTPS origin including port. Legacy credentials migrate only to the pinned original host. Host changes stop old requests, clear active credentials, and require verification. Authenticated API URLs and redirects retain the same origin. | Origin/port/invalid-host boundary tests, original-host migration test, host verification and failed-save tests. Redirect policy is unit-tested; a real HTTP redirect was not exercised. |
+| Completed GitLab Todos were fetched, but only pending-page headers controlled pagination. | Either stream can advertise another page; merged results deduplicate by ID and order deterministically. | Stubbed empty/finished pending stream with continuing completed pages and overlapping IDs. |
+| The 900-second retry cap also limited successful polling. | Successful polling honors 30–3600 seconds; failures back off with a cap that never shortens a longer selected interval. Provider poll/retry/reset headers set minimum waits. Manual refresh schedules the next poll rather than duplicating it immediately; rate limits block manual, verification, pagination, and mutation retries. | The old expression returned 900 for both 1800 and 3600 seconds. Tests cover the advertised range, failure backoff, malformed/numeric/date/reset headers, blocked retries, and manual-refresh request counts. |
+| Several mutation failure and cleanup paths ignored request ownership. | Success, failure, and cleanup all check the request generation. Bulk confirmations also retain the reviewed account, generation, loaded IDs, and refresh timestamp. | Delayed failures for individual read/done and bulk read/done cannot change the new account; stale confirmations cannot run. |
+| The deployment target inherited an SDK-recommended value despite an advertised 14.6 minimum. | All configurations explicitly target macOS 14.6; About/README and project guidance agree. Existing guarded newer-system styling remains. | Xcode builds target arm64-apple-macos14.6. Running on macOS 14.6 itself remains a release check. |
+| Startup called `SecItemCopyMatching` synchronously in `RuntimeData.init`. | Security calls run in `TokenStore`’s actor; app initialization performs no Keychain read, and Settings exposes loading/retry state. | Original launch sample showed the main thread waiting in `RuntimeData.init → TokenStore.token → SecItemCopyMatching`. A delayed credential fake proves the UI actor remains responsive. The signed published app was not benchmarked. |
+
+Impact is limited to GitBird’s macOS app, hosted tests, configuration, and documentation. Shared provider code affects GitHub and GitLab, initial refresh, polling, pagination, token verification, and notification mutations. Existing icon edits were retained. No Neon source, external provider data, login-item registration, or production credentials were changed by validation. No dependencies or telemetry were added.
+
+## Product improvements delivered
+
+- Actionable first-run, expired-token, permissions, host, offline, rate-limit, and Keychain messages, with Account settings and retry actions. Token edits remain drafts until **Verify and save token** succeeds.
+- Local search of loaded title/repository/reason, clear-search control, and no-results feedback while preserving pagination. Shortcuts: ⌘F search, ⌘R refresh, ⌘, Settings.
+- Menu bar labels identify loaded unread items and append `+` when more pages exist.
+- Optional launch at login using `SMAppService.mainApp`, with approval guidance and service-status/error handling.
+- Bulk confirmations explain that GitHub done affects loaded items including search-hidden items, GitHub read covers account items up to the last refresh, and GitLab completion covers every pending Todo including unloaded items.
+- Hosted regression tests and a pull-request/main-push build/test workflow. The workflow is local and has not run on GitHub yet.
+
+Keep GitBird’s focused menu bar workflow. Further expansion into a full Git client would increase scope without improving this core use case.
+
+## Support purchase
+
+Settings → Support contains a repeatable optional consumable tip, Patreon, repository, and feedback links. StoreKit supplies localized pricing; purchases handle cancellation, pending, failure, verified finishing, restrictions, and concurrency. The app starts transaction update/unfinished listeners. No feature is locked behind a purchase.
+
+Proposed product ID: `com.h3p.GitBird.support.tip`. The local StoreKit fixture uses 4.99; it does not set a live price. App Store Connect is at sign-in and the user is away from their Mac, so creation of the consumable, storefront pricing/localization, commercial eligibility, review screenshot, sandbox/TestFlight purchase, and submission still require an authenticated session. README contains the concrete setup steps. Do not describe the tip as live until those checks pass.
+
+## Verification results
+
+- **Verification Level: 1.** Shared cross-platform code changed: **No**. Platforms affected: **macOS only**. No iOS/iPadOS target exists, and no cross-platform issue was found.
+- Xcode 27.0 on macOS 27.0.1: optimized Release build succeeded with Swift 6 complete strict-concurrency checking. No Swift compiler warnings; App Intents metadata extraction reported no framework dependency.
+- 21 hosted tests pass: 16 reliability tests and five support tests, including two distinct repeatable local StoreKit purchases and transaction finishing. The StoreKit test also passed ten consecutive repetitions after the harness isolated the debug app’s background services, exercised its own transaction listener, and gated overlapping purchase attempts deterministically. Cancellation/pending/error and concurrency branches use injected purchase results. Subsequent real Ask-to-Buy approval and crash-relaunch unfinished recovery have not been exercised.
+- The sandbox-enabled ad-hoc test run passed all 14 reliability tests then present and four support tests; the local StoreKit product lookup returned no product. Full StoreKit verification uses an isolated bundle ID and command-only ad-hoc signing, hardened-runtime, and sandbox overrides. Production project sandbox and hardened-runtime settings remain enabled. These tests do not prove shipping signature/Keychain access or App Store sandbox behavior.
+- Native computer-use inspection timed out for the temporary app; the user is currently unavailable for manual validation. Accessibility labels/native semantics and shortcut/focus declarations were reviewed in source. Visual layout, actual keyboard focus order, VoiceOver, and launch-at-login registration require runtime validation with the installed signed app.
+- Project plist, scheme XML, StoreKit JSON, CI workflow structure, and `git diff --check` pass. Test evidence and build logs are saved outside DerivedData before cleanup.
+
+Evidence: `/tmp/GitBird-improvements-results.xcresult`, `/tmp/gitbird-improvements-tests.log`, `/tmp/gitbird-improvements-release.log`, and `/tmp/gitbird-storekit-repeat.log`.
+
+The CI runner choice matches [GitHub’s supported macOS runner images](https://github.com/actions/runner-images/blob/main/README.md). StoreKit transaction finishing follows [Apple’s unfinished-transaction contract](https://developer.apple.com/documentation/storekit/transaction/unfinished); tests assert the queue settles without manually finishing transactions in the assertion.
+
+## Remaining release checks
+
+Authenticate App Store Connect and complete the consumable setup, run a signed sandbox/TestFlight purchase with local StoreKit configuration disabled, validate accessibility and login items on supported Macs (including macOS 14.6), run the committed workflow remotely, then follow the existing signed release process. GitHub release preparation targets v2.1.6 (build 187). Publication evidence is available on the release page and associated workflow runs. App Review submission and live consumable provisioning remain pending.

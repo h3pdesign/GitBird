@@ -14,16 +14,32 @@ struct ContentView: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
 
+    @AppStorage("settingsSection") private var settingsSection = "general"
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
+    @State private var bulkAction: BulkActionContext?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
             Divider()
+            searchField
             content
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(MenuBarWindowSurface())
         .frame(width: 420)
+        .confirmationDialog(bulkAction?.title ?? "Confirm action", isPresented: Binding(
+            get: { bulkAction != nil }, set: { if !$0 { bulkAction = nil } }
+        ), titleVisibility: .visible, presenting: bulkAction) { context in
+            Button(context.provider == .gitlab ? "Complete all Todos" : "Confirm", role: .destructive) {
+                runtimeData.performBulkAction(context)
+            }
+            Button("Cancel", role: .cancel) { bulkAction = nil }
+        } message: { context in
+            Text(context.message)
+        }
     }
 
     private struct NotificationGroup: Identifiable {
@@ -32,9 +48,27 @@ struct ContentView: View {
         let threads: [GitHubNotificationThread]
     }
 
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+            TextField("Search loaded notifications", text: $searchText)
+                .textFieldStyle(.plain)
+                .focused($searchFocused)
+                .accessibilityLabel("Search loaded notifications")
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
+            }
+            Button { searchFocused = true } label: { EmptyView() }
+                .keyboardShortcut("f")
+                .accessibilityHidden(true)
+        }
+    }
+
     private var notificationGroups: [NotificationGroup] {
         let calendar = Calendar.autoupdatingCurrent
-        let groups = Dictionary(grouping: runtimeData.notifications) { thread in
+        let groups = Dictionary(grouping: runtimeData.notifications.filter { $0.matchesSearch(searchText) }) { thread in
             if calendar.isDateInToday(thread.updatedAt) {
                 return "today"
             }
@@ -94,10 +128,11 @@ struct ContentView: View {
             .controlSize(.regular)
             .disabled(runtimeData.isRefreshing)
             .accessibilityLabel("Refresh notifications")
-            .help("Refresh")
+            .help("Refresh (⌘R)")
+            .keyboardShortcut("r")
 
             Button {
-                runtimeData.markAllNotificationsAsRead()
+                bulkAction = runtimeData.prepareBulkAction(.read)
             } label: {
                 if runtimeData.isMarkingAllNotificationsAsRead {
                     ProgressView()
@@ -113,12 +148,12 @@ struct ContentView: View {
             }
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
-            .disabled(runtimeData.notifications.isEmpty || runtimeData.isMarkingAllNotificationsAsRead)
+            .disabled(runtimeData.notifications.isEmpty || runtimeData.isPerformingBulkAction)
             .accessibilityLabel(runtimeData.provider == .gitlab ? "Complete all GitLab Todos" : "Mark all notifications as read")
             .help(runtimeData.provider == .gitlab ? "Complete all Todos" : "Mark all as read")
 
             Button {
-                runtimeData.markAllNotificationsAsDone()
+                bulkAction = runtimeData.prepareBulkAction(.done)
             } label: {
                 if runtimeData.isMarkingAllNotificationsAsDone {
                     ProgressView()
@@ -134,9 +169,9 @@ struct ContentView: View {
             }
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
-            .disabled(runtimeData.notifications.isEmpty || runtimeData.isMarkingAllNotificationsAsDone)
-            .accessibilityLabel("Mark all notifications as done")
-            .help("Mark all as done")
+            .disabled(runtimeData.notifications.isEmpty || runtimeData.isPerformingBulkAction)
+            .accessibilityLabel(runtimeData.provider == .gitlab ? "Complete all GitLab Todos" : "Complete loaded notifications")
+            .help(runtimeData.provider == .gitlab ? "Complete all Todos, including unloaded items" : "Complete loaded notifications, including search-hidden items")
 
             Button {
                 openURL(runtimeData.providerNotificationsURL)
@@ -163,7 +198,8 @@ struct ContentView: View {
             .modifier(GlassHeaderButtonStyle())
             .controlSize(.regular)
             .accessibilityLabel("Open Settings")
-            .help("Settings")
+            .help("Settings (⌘,)")
+            .keyboardShortcut(",")
 
             Button {
                 NSApplication.shared.terminate(nil)
@@ -182,8 +218,9 @@ struct ContentView: View {
     }
 
     private var subtitle: String {
+        if runtimeData.isLoadingCredentials { return "Loading account…" }
         if !runtimeData.errorMessage.isEmpty {
-            return "Error"
+            return "Account or connection needs attention"
         }
         if !runtimeData.statusMessage.isEmpty {
             return runtimeData.statusMessage
@@ -210,7 +247,10 @@ struct ContentView: View {
 
     @ViewBuilder
     private var content: some View {
-        if !runtimeData.errorMessage.isEmpty {
+        if runtimeData.isLoadingCredentials {
+            ProgressView("Loading your account securely…")
+                .accessibilityLabel("Loading account credentials")
+        } else if !runtimeData.errorMessage.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.triangle")
@@ -220,8 +260,19 @@ struct ContentView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Button("Retry") {
-                    runtimeData.renewPullTask(interval: runtimeData.interval)
+                HStack {
+                    Button("Account Settings") {
+                        settingsSection = "token"
+                        NSApp.activate(ignoringOtherApps: true)
+                        openSettings()
+                    }
+                    Button("Retry") {
+                        if runtimeData.credentialError.isEmpty {
+                            runtimeData.renewPullTask(interval: runtimeData.interval)
+                        } else {
+                            Task { await runtimeData.loadCredentials() }
+                        }
+                    }
                 }
                 .buttonStyle(.link)
                 .tint(.orange)
@@ -246,6 +297,11 @@ struct ContentView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
+                    if notificationGroups.isEmpty {
+                        Text("No loaded notifications match your search.")
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 12)
+                    }
                     ForEach(notificationGroups) { group in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(group.title)

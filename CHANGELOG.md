@@ -2,6 +2,33 @@
 
 All notable changes to GitBird are documented here.
 
+## Unreleased
+
+## [2.1.6] - 2026-09-30
+
+### Added
+
+- Support settings with Patreon, GitHub, and feedback links, plus optional repeatable App Store tip integration pending App Store product setup. All features remain available without a purchase.
+- StoreKit 2 pricing, verified transaction handling, pending-purchase recovery, and a local StoreKit test configuration.
+- Search loaded notifications by title, repository, and reason; refresh/settings/search keyboard shortcuts.
+- Optional launch-at-login control and clear setup/retry actions.
+- Bulk-action confirmations showing the provider’s exact affected scope and loaded-count pagination indication.
+- Credential, provider, polling, pagination, stale-action, and purchase regression tests; pull-request build/test workflow.
+
+### Improved
+
+- Refresh the app icon appearance.
+
+### Fixed
+
+- Check Keychain read/write/delete failures, preserve migration sources until persistence succeeds, and load credentials away from the UI thread.
+- Bind GitLab credentials and legacy migration to the original HTTPS origin; reject authenticated cross-origin redirects and require token verification after host changes.
+- Persist token drafts only after provider verification and successful secure storage.
+- Continue pagination when completed GitLab Todos have more pages than pending Todos, with deterministic ID deduplication.
+- Respect refresh intervals up to one hour and provider polling/rate-limit retry guidance.
+- Ignore stale action failures and cleanup after account changes.
+- Pin the supported minimum to macOS 14.6 across build configurations.
+
 ## [2.1.5] - 2026-08-10
 
 ### Performance and reliability

@@ -5,7 +5,7 @@ This project is a native macOS menubar app built with SwiftUI. It shows the user
 ## Project stance
 
 - This is a small utility. Keep everything simple; no over-engineering.
-- Support only the latest 3 macOS versions. The latest is macOS 26 (so support 24/25/26).
+- Deployment minimum: macOS 14.6. Preserve compatibility with macOS 14/15 and later versions; gate newer SDK APIs.
 
 ## Principles (keep it simple)
 
@@ -31,5 +31,5 @@ This project is a native macOS menubar app built with SwiftUI. It shows the user
 
 ## Compatibility
 
-- Target macOS 24/25/26; gate newer APIs with `@available` or conditional fallbacks.
+- Target macOS 14.6+ with an explicit deployment target; gate newer APIs with `@available` or conditional fallbacks.
 - Menubar UX follows HIG: lightweight, fast to open, low distraction.

@@ -1,11 +1,17 @@
 {
   "color-space-for-untagged-svg-colors" : "display-p3",
-  "fill" : "automatic",
+  "fill" : {
+    "linear-gradient" : [
+      "extended-gray:1.00000,1.00000",
+      "srgb:0.91061,0.91061,0.91061,1.00000"
+    ]
+  },
   "groups" : [
     {
       "hidden" : false,
       "layers" : [
         {
+          "glass" : true,
           "hidden" : false,
           "image-name" : "gitbird-bird-symbol-red.svg",
           "name" : "gitbird-bird-symbol-red",
@@ -20,11 +26,14 @@
         {
           "blend-mode-specializations" : [
             {
+              "value" : "multiply"
+            },
+            {
               "appearance" : "dark",
               "value" : "hard-light"
             }
           ],
-          "fill" : "none",
+          "fill" : "automatic",
           "hidden" : false,
           "image-name" : "gitbird-git-symbol-red.svg",
           "name" : "gitbird-git-symbol-red",

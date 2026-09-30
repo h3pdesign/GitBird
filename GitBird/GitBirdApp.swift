@@ -9,11 +9,22 @@ import SwiftUI
 
 @main
 struct GitBirdApp: App {
+    @State private var support: SupportPurchaseManager
     init() {
+        let support = SupportPurchaseManager()
+        _support = State(initialValue: support)
+        // Hosted tests create their own services and StoreKit sessions. Prevent
+        // the debug app host from consuming those transactions concurrently.
+        #if DEBUG
+        let isHostedTest = ProcessInfo.processInfo.environment["GITBIRD_HOSTED_TESTS"] == "1"
+        #else
+        let isHostedTest = false
+        #endif
+        if !isHostedTest { support.start() }
         AppLog.bootstrap()
         AppLog.info("App launch")
-        Task { @MainActor in
-            RuntimeData.shared.start()
+        if !isHostedTest {
+            Task { @MainActor in RuntimeData.shared.start() }
         }
     }
 
@@ -21,6 +32,7 @@ struct GitBirdApp: App {
         MenuBarExtra {
             ContentView()
                 .environmentObject(RuntimeData.shared)
+                .environment(support)
                 .frame(width: 420, height: 520)
         } label: {
             MenuBarLabelView()
@@ -31,6 +43,7 @@ struct GitBirdApp: App {
         Settings {
             SettingView()
                 .environmentObject(RuntimeData.shared)
+                .environment(support)
         }
     }
 }
@@ -52,7 +65,7 @@ private struct MenuBarLabelView: View {
                 .frame(width: 18, height: 18)
 
             if count > 0 {
-                Text("\(count)")
+                Text(runtimeData.hasMoreNotifications ? "\(count)+" : "\(count)")
                     .monospacedDigit()
             }
 
@@ -61,6 +74,6 @@ private struct MenuBarLabelView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(count > 0 ? "GitBird, \(count) unread notifications" : "GitBird, no unread notifications")
+        .accessibilityLabel("GitBird, \(count) loaded unread notifications\(runtimeData.hasMoreNotifications ? ", more pages available" : "")\(hasError ? ", account or connection needs attention" : "")")
     }
 }

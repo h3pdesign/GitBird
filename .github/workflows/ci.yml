@@ -1,0 +1,47 @@
+name: GitBird macOS CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitbird-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          XCODE_PATH="$(find /Applications -maxdepth 1 -name 'Xcode*.app' -print | sort -V | tail -n1)"
+          test -n "$XCODE_PATH"
+          sudo xcode-select --switch "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+      - name: Build optimized app
+        run: |
+          xcodebuild -project GitBird.xcodeproj -scheme GitBird -configuration Release \
+            -destination 'platform=macOS' -derivedDataPath "$RUNNER_TEMP/GitBird-release" \
+            CODE_SIGNING_ALLOWED=NO build
+      # These overrides affect only the isolated local StoreKit test host.
+      - name: Test isolated local app
+        run: |
+          xcodebuild -project GitBird.xcodeproj -scheme GitBird -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath "$RUNNER_TEMP/GitBird-tests" \
+            -resultBundlePath "$RUNNER_TEMP/GitBird-tests.xcresult" \
+            PRODUCT_BUNDLE_IDENTIFIER=com.h3p.GitBird.CI CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= ENABLE_HARDENED_RUNTIME=NO ENABLE_APP_SANDBOX=NO test
+      - name: Preserve test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GitBird-test-results
+          path: ${{ runner.temp }}/GitBird-tests.xcresult
+          if-no-files-found: ignore
