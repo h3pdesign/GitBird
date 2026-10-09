@@ -461,7 +461,9 @@ final class ReliabilityTests: XCTestCase {
                 await data.loadCredentials()
                 await eventually { data.lastPull != nil }
                 data.notifications = [try Self.thread(provider: provider)]
-                let host = NSHostingView(rootView: ContentView().environmentObject(data))
+                // Hosted tests need accessibility enabled explicitly when the
+                // runner has no assistive client to activate SwiftUI's tree.
+                let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true))
                 let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled, .closable], backing: .buffered, defer: false)
                 window.isReleasedWhenClosed = false
                 NSApp.activate()
@@ -487,8 +489,7 @@ final class ReliabilityTests: XCTestCase {
                 if inPopover { await eventually { popover.isShown } }
                 host.layoutSubtreeIfNeeded()
                 host.window?.displayIfNeeded()
-                // Older SwiftUI versions expose hosted controls through their
-                // NSWindow accessibility root rather than the hosting view.
+                // Limit lookup to this test's hosting view and containing window.
                 let contentRoot: [Any] = [host, try XCTUnwrap(host.window)]
                 let label = kind == .read ? "bulkRead" : "bulkDone"
                 await eventually { self.accessibilityButton(named: label, roots: contentRoot) != nil }
