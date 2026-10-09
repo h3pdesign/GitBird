@@ -485,9 +485,16 @@ final class ReliabilityTests: XCTestCase {
                 }
                 defer { popover.close(); window.close(); data.stop() }
                 if inPopover { await eventually { popover.isShown } }
-                let contentRoot: [Any] = [host]
+                host.layoutSubtreeIfNeeded()
+                host.window?.displayIfNeeded()
+                // Older SwiftUI versions expose hosted controls through their
+                // NSWindow accessibility root rather than the hosting view.
+                let contentRoot: [Any] = [host, try XCTUnwrap(host.window)]
                 let label = kind == .read ? "bulkRead" : "bulkDone"
                 await eventually { self.accessibilityButton(named: label, roots: contentRoot) != nil }
+                if accessibilityButton(named: label, roots: contentRoot) == nil {
+                    XCTFail("Missing \(label). \(accessibilityTreeDescription(roots: contentRoot))")
+                }
                 let action = try XCTUnwrap(accessibilityButton(named: label, roots: contentRoot))
                 XCTAssertTrue(pressAccessibilityButton(action))
                 let confirmationLabel = cancel ? "Cancel" : (provider == .gitlab ? "Complete all Todos" : "Confirm")
@@ -544,6 +551,21 @@ final class ReliabilityTests: XCTestCase {
         guard button.responds(to: selector), let implementation = button.method(for: selector) else { return false }
         typealias Press = @convention(c) (AnyObject, Selector) -> ObjCBool
         return unsafeBitCast(implementation, to: Press.self)(button, selector).boolValue
+    }
+
+    private func accessibilityTreeDescription(roots: [Any]) -> String {
+        func describe(_ node: Any, depth: Int) -> String {
+            guard depth < 8, let element = node as? NSObject else { return "" }
+            func attribute(_ name: String) -> Any? {
+                let selector = NSSelectorFromString(name)
+                guard element.responds(to: selector) else { return nil }
+                return element.perform(selector)?.takeUnretainedValue()
+            }
+            let attributes = ["accessibilityRole", "accessibilityLabel", "accessibilityTitle", "accessibilityIdentifier"].map { String(describing: attribute($0)) }
+            let children = attribute("accessibilityChildren") as? [Any] ?? []
+            return "\(type(of: element)) \(attributes)\n" + children.map { describe($0, depth: depth + 1) }.joined()
+        }
+        return String(roots.map { describe($0, depth: 0) }.joined().prefix(6000))
     }
 
     func testGitLabBulkFailuresPreserveHTTPGuidanceAndRateLimits() async throws {
