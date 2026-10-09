@@ -106,7 +106,7 @@ xcodebuild -project GitBird.xcodeproj -scheme GitBird \
   ENABLE_HARDENED_RUNTIME=NO ENABLE_APP_SANDBOX=NO test
 ```
 
-The command above isolates test credentials and uses test-only signing/runtime overrides for local StoreKit. Shipping settings retain App Sandbox and hardened runtime. [CI](https://github.com/h3pdesign/GitBird/actions/workflows/ci.yml) builds Release and runs the full test suite on pull requests and main-branch pushes. The [release workflow](https://github.com/h3pdesign/GitBird/actions/workflows/release-notarized.yml) signs, notarizes, staples, and verifies the downloadable app. Signed App Store purchase validation remains a separate requirement before enabling live tips.
+The command above isolates test credentials and uses test-only signing/runtime overrides for local StoreKit. Shipping settings retain App Sandbox and hardened runtime. [CI](https://github.com/h3pdesign/GitBird/actions/workflows/ci.yml) builds Release and runs the full test suite on pull requests and main-branch pushes. The [2.1.7 CI run](https://github.com/h3pdesign/GitBird/actions/runs/37912473290) passed the Release build and all 34 tests, including native confirmation controls and local StoreKit purchases. The [2.1.7 release workflow](https://github.com/h3pdesign/GitBird/actions/runs/37912737865) signed, notarized, stapled, and published the downloadable app. The public ZIP passed checksum, signature, stapling, and Gatekeeper verification after download. Signed App Store purchase validation remains a separate requirement before enabling live tips.
 
 See [REVIEW.md](./REVIEW.md) for findings, fixes, evidence, and remaining release checks.
 
