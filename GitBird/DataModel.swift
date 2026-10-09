@@ -622,8 +622,9 @@ struct GitHubAPIClient: Sendable {
             guard isAllowedAuthenticatedURL(actionURL) else { throw APIError.invalidResponse }
             var request = makeRequest(url: actionURL)
             request.httpMethod = "POST"
-            let (_, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw APIError.invalidResponse }
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+            guard (200...299).contains(http.statusCode) else { throw Self.responseError(http, data: data) }
             return
         }
 
@@ -647,8 +648,9 @@ struct GitHubAPIClient: Sendable {
             guard isAllowedAuthenticatedURL(actionURL) else { throw APIError.invalidResponse }
             var request = makeRequest(url: actionURL)
             request.httpMethod = "POST"
-            let (_, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw APIError.invalidResponse }
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+            guard (200...299).contains(http.statusCode) else { throw Self.responseError(http, data: data) }
             return
         }
 
@@ -1484,7 +1486,8 @@ struct BulkActionContext: Identifiable {
         guard !activeToken.isEmpty else { return }
 
         guard mayPerformProviderAction() else { return }
-        let targets = context?.threads ?? notifications
+        // GitLab completes every pending Todo; GitHub deletes the reviewed IDs.
+        let targets = provider == .gitlab ? notifications : (context?.threads ?? notifications)
         let targetIDs = Set(targets.map(\.id))
         let targetURLs = targets.map(\.url)
         let generation = requestGeneration
@@ -1499,6 +1502,8 @@ struct BulkActionContext: Identifiable {
                     self.isMarkingAllNotificationsAsDone = false
                     self.notifications.removeAll { targetIDs.contains($0.id) }
                     self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { !targetIDs.contains($0.key) }
+                    self.errorMessage = ""
+                    self.statusMessage = self.provider == .gitlab ? "Completed Todos" : "Marked loaded notifications as done"
                 }
             } catch {
                 AppLog.warning("Failed to mark all notifications as done")
@@ -1517,12 +1522,18 @@ struct BulkActionContext: Identifiable {
         guard !activeToken.isEmpty else { return }
 
         guard mayPerformProviderAction() else { return }
-        let targets = context?.threads ?? notifications
+        // Preserve a nil cutoff from the confirmation rather than substituting
+        // a newer refresh, and reconcile all loaded items in the API's scope.
+        let lastReadAt: Date?
+        if let context { lastReadAt = context.lastPull } else { lastReadAt = lastPull }
+        let targets = notifications.filter { thread in
+            guard provider == .github, let lastReadAt else { return true }
+            return thread.updatedAt <= lastReadAt
+        }
         let targetIDs = Set(targets.map(\.id))
         let targetURLs = targets.map(\.url)
         let generation = requestGeneration
         let api = GitHubAPIClient(token: activeToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL), session: apiSession)
-        let lastReadAt = context?.lastPull ?? lastPull
         isMarkingAllNotificationsAsRead = true
 
         Task.detached(priority: .utility) { [weak self, targetURLs] in

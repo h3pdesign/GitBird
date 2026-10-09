@@ -4,6 +4,18 @@ All notable changes to GitBird are documented here.
 
 ## Unreleased
 
+## [2.1.7] - 2026-10-09
+
+### Fixed
+
+- Keep bulk read/done confirmation inside the notification popup so confirming works reliably for GitHub and GitLab.
+- Reconcile loaded items with the provider's bulk-action scope, retaining the originally confirmed GitHub read cutoff and loaded GitHub done IDs.
+- Preserve GitLab bulk permission/rate-limit errors and retry delays; clear earlier errors after successful bulk completion.
+
+### Validation
+
+- Native confirmation controls, Return/Escape, provider scope, individual actions, errors, and retry recovery have regression coverage. HTTP test fixtures are isolated per session to prevent late requests from contaminating subsequent tests.
+
 ## [2.1.6] - 2026-09-30
 
 ### Added

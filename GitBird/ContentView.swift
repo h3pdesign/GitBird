@@ -23,23 +23,40 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             header
             Divider()
-            searchField
-            content
+            if let context = bulkAction {
+                bulkConfirmation(context)
+            } else {
+                searchField
+                content
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(MenuBarWindowSurface())
         .frame(width: 420)
-        .confirmationDialog(bulkAction?.title ?? "Confirm action", isPresented: Binding(
-            get: { bulkAction != nil }, set: { if !$0 { bulkAction = nil } }
-        ), titleVisibility: .visible, presenting: bulkAction) { context in
-            Button(context.provider == .gitlab ? "Complete all Todos" : "Confirm", role: .destructive) {
-                runtimeData.performBulkAction(context)
-            }
-            Button("Cancel", role: .cancel) { bulkAction = nil }
-        } message: { context in
+    }
+
+    // A separate system dialog takes focus away from the transient menu-bar
+    // host. Keep the reviewed snapshot and its actions in the same popup.
+    private func bulkConfirmation(_ context: BulkActionContext) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(context.title)
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             Text(context.message)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Cancel", role: .cancel) { bulkAction = nil }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button(context.provider == .gitlab ? "Complete all Todos" : "Confirm", role: .destructive) {
+                    bulkAction = nil
+                    runtimeData.performBulkAction(context)
+                }
+                .keyboardShortcut(.defaultAction)
+            }
         }
+        .padding(.vertical, 8)
     }
 
     private struct NotificationGroup: Identifiable {
@@ -99,6 +116,7 @@ struct ContentView: View {
             Spacer(minLength: 8)
 
             headerControls
+                .disabled(bulkAction != nil)
         }
     }
 
@@ -151,6 +169,7 @@ struct ContentView: View {
             .disabled(runtimeData.notifications.isEmpty || runtimeData.isPerformingBulkAction)
             .accessibilityLabel(runtimeData.provider == .gitlab ? "Complete all GitLab Todos" : "Mark all notifications as read")
             .help(runtimeData.provider == .gitlab ? "Complete all Todos" : "Mark all as read")
+            .accessibilityIdentifier("bulkRead")
 
             Button {
                 bulkAction = runtimeData.prepareBulkAction(.done)
@@ -172,6 +191,7 @@ struct ContentView: View {
             .disabled(runtimeData.notifications.isEmpty || runtimeData.isPerformingBulkAction)
             .accessibilityLabel(runtimeData.provider == .gitlab ? "Complete all GitLab Todos" : "Complete loaded notifications")
             .help(runtimeData.provider == .gitlab ? "Complete all Todos, including unloaded items" : "Complete loaded notifications, including search-hidden items")
+            .accessibilityIdentifier("bulkDone")
 
             Button {
                 openURL(runtimeData.providerNotificationsURL)

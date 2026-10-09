@@ -24,7 +24,7 @@ A native macOS menu bar app for keeping GitHub and GitLab notifications close at
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.6](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.6).
+See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.7](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.7).
 
 ## Requirements
 
@@ -34,7 +34,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release 
 
 ## Install
 
-Download [GitBird 2.1.6](https://github.com/h3pdesign/GitBird/releases/download/v2.1.6/GitBird-2.1.6.zip), unzip it, move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon. The universal download supports Apple Silicon and Intel, is Developer ID signed, notarized, and stapled, and requires macOS 14.6+. Check the archive against [SHA256SUMS.txt](https://github.com/h3pdesign/GitBird/releases/download/v2.1.6/SHA256SUMS.txt).
+Download [GitBird 2.1.7](https://github.com/h3pdesign/GitBird/releases/download/v2.1.7/GitBird-2.1.7.zip), unzip it, move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon. The universal download supports Apple Silicon and Intel, is Developer ID signed, notarized, and stapled, and requires macOS 14.6+. Check the archive against [SHA256SUMS.txt](https://github.com/h3pdesign/GitBird/releases/download/v2.1.7/SHA256SUMS.txt).
 
 ## Configure GitHub
 
@@ -60,6 +60,8 @@ GitLab notifications are represented by the GitLab Todo API. Pending Todos are s
 The provider is the source of truth. GitBird does not maintain a separate local read database. When **Hide read notifications** is enabled, GitBird requests only items the provider still considers unread or pending. When it is disabled, read/completed items that still exist on the provider are eligible to appear.
 
 Use the green check action to mark an item read. Use Delete or the done action to complete it. The refresh button reloads the current provider state. Bulk actions require confirmation: GitHub read applies to account notifications up to the last refresh time, GitHub done completes the loaded items (including search-hidden items), and both GitLab actions complete every pending Todo, including unloaded items.
+
+GitBird 2.1.7 keeps bulk confirmation inside the notification popup. Choose **Confirm** (GitHub) or **Complete all Todos** (GitLab), or press Return, to run the action. Choose **Cancel** or press Escape to return without changes. Failed requests retain the items and show provider guidance; successful requests update the list and clear earlier action errors.
 
 Search filters only loaded notifications; **Load more** remains available. The menu bar count is the loaded unread count, with `+` when more pages exist. It is not a provider-wide total. Successful polling respects the selected interval; failures back off and provider retry/polling headers set a minimum wait.
 
@@ -104,7 +106,7 @@ xcodebuild -project GitBird.xcodeproj -scheme GitBird \
   ENABLE_HARDENED_RUNTIME=NO ENABLE_APP_SANDBOX=NO test
 ```
 
-The command above isolates test credentials and uses test-only signing/runtime overrides for local StoreKit. Shipping settings retain App Sandbox and hardened runtime. `.github/workflows/ci.yml` builds Release and runs these tests on pull requests and main-branch pushes; The [2.1.6 CI run](https://github.com/h3pdesign/GitBird/actions/runs/36661232258) passed its Release build and all 21 tests. CI verifies source builds and local purchase behavior. The [2.1.6 release workflow](https://github.com/h3pdesign/GitBird/actions/runs/36661475728) signed, notarized, stapled, and verified the downloadable app. The uploaded archive also passed checksum, signature, stapling, and Gatekeeper checks after download. Signed App Store purchase validation remains a separate requirement before enabling live tips.
+The command above isolates test credentials and uses test-only signing/runtime overrides for local StoreKit. Shipping settings retain App Sandbox and hardened runtime. [CI](https://github.com/h3pdesign/GitBird/actions/workflows/ci.yml) builds Release and runs the full test suite on pull requests and main-branch pushes. The [release workflow](https://github.com/h3pdesign/GitBird/actions/workflows/release-notarized.yml) signs, notarizes, staples, and verifies the downloadable app. Signed App Store purchase validation remains a separate requirement before enabling live tips.
 
 See [REVIEW.md](./REVIEW.md) for findings, fixes, evidence, and remaining release checks.
 

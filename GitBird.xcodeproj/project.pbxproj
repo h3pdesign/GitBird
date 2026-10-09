@@ -6,14 +6,6 @@
 	objectVersion = 100;
 	objects = {
 
-/* Begin PBXTargetDependency section */
-        A73F10203040506070809010 = {isa = PBXTargetDependency; target = 542612602ACFB17E00682CA7; targetProxy = A73F10203040506070809009; };
-/* End PBXTargetDependency section */
-
-/* Begin PBXContainerItemProxy section */
-        A73F10203040506070809009 = {isa = PBXContainerItemProxy; containerPortal = 542612592ACFB17E00682CA7; proxyType = 1; remoteGlobalIDString = 542612602ACFB17E00682CA7; remoteInfo = GitBird; };
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXBuildFile section */
 		542612652ACFB17E00682CA7 /* GitBirdApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542612642ACFB17E00682CA7 /* GitBirdApp.swift */; };
 		542612672ACFB17E00682CA7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542612662ACFB17E00682CA7 /* ContentView.swift */; };
@@ -26,10 +18,20 @@
 		54A0D00A2D0F000100000001 /* AppLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0082D0F000100000001 /* AppLog.swift */; };
 		54A0D00C2D0F000100000001 /* AppIcon.icon in Frameworks */ = {isa = PBXBuildFile; fileRef = 54A0D00B2D0F000100000001 /* AppIcon.icon */; };
 		A73F10203040506070809001 /* SupportPurchaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73F10203040506070809002 /* SupportPurchaseManager.swift */; };
-        A73F10203040506070809004 = {isa = PBXBuildFile; fileRef = A73F10203040506070809005; };
-        A73F10203040506070809006 = {isa = PBXBuildFile; fileRef = A73F10203040506070809003; };
-        B84F10203040506070809001 /* ReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B84F10203040506070809002; };
+		A73F10203040506070809004 /* SupportPurchaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73F10203040506070809005 /* SupportPurchaseManagerTests.swift */; };
+		A73F10203040506070809006 /* SupportOptional.storekit in Resources */ = {isa = PBXBuildFile; fileRef = A73F10203040506070809003 /* SupportOptional.storekit */; };
+		B84F10203040506070809001 /* ReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B84F10203040506070809002 /* ReliabilityTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A73F10203040506070809009 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 542612592ACFB17E00682CA7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 542612602ACFB17E00682CA7;
+			remoteInfo = GitBird;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		542612612ACFB17E00682CA7 /* GitBird.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GitBird.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -47,9 +49,9 @@
 		54A0D00B2D0F000100000001 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		A73F10203040506070809002 /* SupportPurchaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportPurchaseManager.swift; sourceTree = "<group>"; };
 		A73F10203040506070809003 /* SupportOptional.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = SupportOptional.storekit; sourceTree = "<group>"; };
-        A73F10203040506070809005 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportPurchaseManagerTests.swift; sourceTree = "<group>"; };
-        A73F10203040506070809007 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = GitBirdTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-        B84F10203040506070809002 /* ReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReliabilityTests.swift; sourceTree = "<group>"; };
+		A73F10203040506070809005 /* SupportPurchaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportPurchaseManagerTests.swift; sourceTree = "<group>"; };
+		A73F10203040506070809007 /* GitBirdTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = GitBirdTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B84F10203040506070809002 /* ReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReliabilityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,7 +61,11 @@
 				54A0D00C2D0F000100000001 /* AppIcon.icon in Frameworks */,
 			);
 		};
-        A73F10203040506070809013 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A73F10203040506070809013 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -67,7 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				542612632ACFB17E00682CA7 /* GitBird */,
-                A73F10203040506070809008 /* GitBirdTests */,
+				A73F10203040506070809008 /* GitBirdTests */,
 				542612622ACFB17E00682CA7 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -76,7 +82,7 @@
 			isa = PBXGroup;
 			children = (
 				542612612ACFB17E00682CA7 /* GitBird.app */,
-                A73F10203040506070809007 /* GitBirdTests.xctest */,
+				A73F10203040506070809007 /* GitBirdTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -110,7 +116,15 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-        A73F10203040506070809008 = {isa = PBXGroup; children = (A73F10203040506070809005, B84F10203040506070809002,); path = GitBirdTests; sourceTree = "<group>"; };
+		A73F10203040506070809008 /* GitBirdTests */ = {
+			isa = PBXGroup;
+			children = (
+				A73F10203040506070809005 /* SupportPurchaseManagerTests.swift */,
+				B84F10203040506070809002 /* ReliabilityTests.swift */,
+			);
+			path = GitBirdTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -129,7 +143,24 @@
 			productReference = 542612612ACFB17E00682CA7 /* GitBird.app */;
 			productType = "com.apple.product-type.application";
 		};
-        A73F10203040506070809014 = {isa = PBXNativeTarget; buildConfigurationList = A73F10203040506070809015; buildPhases = (A73F10203040506070809011, A73F10203040506070809013, A73F10203040506070809012,); buildRules = (); dependencies = (A73F10203040506070809010,); name = GitBirdTests; productName = GitBirdTests; productReference = A73F10203040506070809007; productType = "com.apple.product-type.bundle.unit-test"; };
+		A73F10203040506070809014 /* GitBirdTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A73F10203040506070809015 /* Build configuration list for PBXNativeTarget "GitBirdTests" */;
+			buildPhases = (
+				A73F10203040506070809011 /* Sources */,
+				A73F10203040506070809013 /* Frameworks */,
+				A73F10203040506070809012 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A73F10203040506070809010 /* PBXTargetDependency */,
+			);
+			name = GitBirdTests;
+			productName = GitBirdTests;
+			productReference = A73F10203040506070809007 /* GitBirdTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -159,7 +190,7 @@
 			projectRoot = "";
 			targets = (
 				542612602ACFB17E00682CA7 /* GitBird */,
-                A73F10203040506070809014 /* GitBirdTests */,
+				A73F10203040506070809014 /* GitBirdTests */,
 			);
 		};
 /* End PBXProject section */
@@ -172,7 +203,12 @@
 				542612692ACFB17F00682CA7 /* Assets.xcassets in Resources */,
 			);
 		};
-        A73F10203040506070809012 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A73F10203040506070809006,); runOnlyForDeploymentPostprocessing = 0; };
+		A73F10203040506070809012 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				A73F10203040506070809006 /* SupportOptional.storekit in Resources */,
+			);
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -189,8 +225,22 @@
 				A73F10203040506070809001 /* SupportPurchaseManager.swift in Sources */,
 			);
 		};
-        A73F10203040506070809011 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A73F10203040506070809004, B84F10203040506070809001,); runOnlyForDeploymentPostprocessing = 0; };
+		A73F10203040506070809011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				A73F10203040506070809004 /* SupportPurchaseManagerTests.swift in Sources */,
+				B84F10203040506070809001 /* ReliabilityTests.swift in Sources */,
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A73F10203040506070809010 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 542612602ACFB17E00682CA7 /* GitBird */;
+			targetProxy = A73F10203040506070809009 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5426126E2ACFB17F00682CA7 /* Debug configuration for PBXProject "GitBird" */ = {
@@ -326,7 +376,7 @@
 				CODE_SIGN_ENTITLEMENTS = GitBird/GitBird.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 187;
+				CURRENT_PROJECT_VERSION = 191;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"GitBird/Preview Content\"";
 				DEVELOPMENT_TEAM = CS727NF72U;
@@ -347,7 +397,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.1.6;
+				MARKETING_VERSION = 2.1.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitBird;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -365,7 +415,7 @@
 				CODE_SIGN_ENTITLEMENTS = GitBird/GitBird.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 187;
+				CURRENT_PROJECT_VERSION = 191;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"GitBird/Preview Content\"";
 				DEVELOPMENT_TEAM = CS727NF72U;
@@ -386,7 +436,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.1.6;
+				MARKETING_VERSION = 2.1.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitBird;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -395,32 +445,48 @@
 			};
 			name = Release;
 		};
-        A73F10203040506070809016 = {isa = XCBuildConfiguration; buildSettings = {
-            BUNDLE_LOADER = "$(TEST_HOST)";
-            CODE_SIGN_STYLE = Automatic;
-            DEVELOPMENT_TEAM = CS727NF72U;
-            GENERATE_INFOPLIST_FILE = YES;
-            LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks",);
-            MACOSX_DEPLOYMENT_TARGET = 14.6;
-            PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitBird.Tests;
-            PRODUCT_NAME = "$(TARGET_NAME)";
-            TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GitBird.app/Contents/MacOS/GitBird";
-            SWIFT_STRICT_CONCURRENCY = complete;
-            SWIFT_VERSION = 6.0;
-        }; name = Debug; };
-        A73F10203040506070809017 = {isa = XCBuildConfiguration; buildSettings = {
-            BUNDLE_LOADER = "$(TEST_HOST)";
-            CODE_SIGN_STYLE = Automatic;
-            DEVELOPMENT_TEAM = CS727NF72U;
-            GENERATE_INFOPLIST_FILE = YES;
-            LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks",);
-            MACOSX_DEPLOYMENT_TARGET = 14.6;
-            PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitBird.Tests;
-            PRODUCT_NAME = "$(TARGET_NAME)";
-            TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GitBird.app/Contents/MacOS/GitBird";
-            SWIFT_STRICT_CONCURRENCY = complete;
-            SWIFT_VERSION = 6.0;
-        }; name = Release; };
+		A73F10203040506070809016 /* Debug configuration for PBXNativeTarget "GitBirdTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = CS727NF72U;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitBird.Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GitBird.app/Contents/MacOS/GitBird";
+			};
+			name = Debug;
+		};
+		A73F10203040506070809017 /* Release configuration for PBXNativeTarget "GitBirdTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = CS727NF72U;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitBird.Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GitBird.app/Contents/MacOS/GitBird";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -440,7 +506,14 @@
 			);
 			defaultConfigurationName = Release;
 		};
-        A73F10203040506070809015 = {isa = XCConfigurationList; buildConfigurations = (A73F10203040506070809016, A73F10203040506070809017,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A73F10203040506070809015 /* Build configuration list for PBXNativeTarget "GitBirdTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A73F10203040506070809016 /* Debug configuration for PBXNativeTarget "GitBirdTests" */,
+				A73F10203040506070809017 /* Release configuration for PBXNativeTarget "GitBirdTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 	};
 	rootObject = 542612592ACFB17E00682CA7 /* Project object */;

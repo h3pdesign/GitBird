@@ -48,10 +48,28 @@ The CI runner choice matches [GitHub’s supported macOS runner images](https://
 
 ## Published GitHub release
 
-[GitBird v2.1.6](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.6), build 187, is published as the latest stable release. [Remote CI](https://github.com/h3pdesign/GitBird/actions/runs/36661232258) passed the Release build and all 21 tests using Xcode 26.6. The [release workflow](https://github.com/h3pdesign/GitBird/actions/runs/36661475728) succeeded.
+[GitBird v2.1.6](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.6), build 187, was published on September 30. [Remote CI](https://github.com/h3pdesign/GitBird/actions/runs/36661232258) passed the Release build and all 21 tests using Xcode 26.6. The [release workflow](https://github.com/h3pdesign/GitBird/actions/runs/36661475728) succeeded.
 
 The downloaded universal (arm64/x86_64) archive passed its published checksum, strict code signature verification, stapled-ticket validation, and Gatekeeper assessment as Notarized Developer ID. The app reports version 2.1.6, build 187, minimum macOS 14.6, and hardened runtime. Archive SHA-256: `50380ca01b1a55e5f5fb2a3ca7bc8cc49afc457e4e02b0bebc6a86117271ab45`.
 
 ## Remaining App Store and runtime checks
 
 Authenticate App Store Connect and complete the consumable setup, run a signed sandbox/TestFlight purchase with local StoreKit configuration disabled, and validate accessibility and login items on supported Macs (including macOS 14.6). App Review submission and live consumable provisioning remain pending.
+
+## Bulk-action follow-up — 2026-10-09 (v2.1.7 release preparation)
+
+The user reported that confirming bulk read/done did nothing for both GitHub and GitLab. Confirmation now stays inside `ContentView` rather than opening a separate system dialog from the transient popup. The same reviewed account/generation and GitHub done IDs are retained; unrelated header controls are disabled while confirmation is visible. Cancel/Escape sends no mutation, and Confirm/Return dispatches the provider action.
+
+Additional reproducible defects were fixed: GitLab bulk requests discarded HTTP status and retry headers; local reconciliation left newly loaded GitLab Todos behind even though the API completed them; GitHub bulk read substituted a later refresh when the confirmed cutoff was nil. Local read updates now match the confirmed cutoff, including loaded items added after confirmation opened, while newer GitHub notifications remain unread. Successful bulk done clears earlier errors and reports completion.
+
+Validation used fake credentials, isolated defaults, and URLProtocol responses; no real GitHub notifications or GitLab Todos were changed.
+
+- 32 tests pass: 28 notification/reliability tests and four support-manager tests. Native production SwiftUI buttons are exercised in a test-owned NSWindow and NSPopover for both providers and both bulk actions, including cancellation, Return, and Escape. Model checks cover individual read/done endpoints, duplicate/busy guards, stale accounts, confirmed scope/cutoff, the show-read setting, HTTP failures, retry recovery, and rate-limit delays.
+- The original confirmation was unreachable in the controlled popover reproduction; the replacement works in that host. This is not an end-to-end trace of the installed SwiftUI MenuBarExtra or a live-account mutation.
+- The optimized universal Release build succeeds for arm64 and x86_64 with the macOS 14.6 deployment target. No Swift compiler warnings were emitted; the existing App Intents metadata notice remains. Shipping sandbox and hardened-runtime settings remain enabled. Existing Xcode project edits were preserved.
+- The remaining StoreKit integration test **did not pass** in this session. The full run stalled; an isolated retry logged `SKServiceErrorDomain Code=2` / `SKInternalErrorDomain Code=4` while saving its configuration and returned no product. A fresh-directory retry timed out after 60 seconds. It was explicitly excluded from the final 32-test run, and its failure result was retained separately. September's purchase-test success is historical evidence, not a current pass.
+- Native computer-use inspection did not succeed. Cached hosting-view images omitted layer-backed SwiftUI text/glass and were removed from the test harness because they were incomplete visual evidence. Installed-app layout/focus, VoiceOver, real account authentication/mutations, login-item registration, live App Store purchases, and execution on macOS 14.6/15 still require runtime validation.
+
+Current evidence: `/tmp/GitBird-bulk-verified-results.xcresult`, `/tmp/gitbird-bulk-verified-tests.log`, `/tmp/gitbird-bulk-release.log`, `/tmp/GitBird-support-recheck-results.xcresult`, and `/tmp/GitBird-support-clean-results.xcresult`. Regression baseline logs are `/tmp/gitbird-popover-baseline.log` and `/tmp/gitbird-bulk-model-baseline.log`. README and the 2.1.7 changelog describe the changes; publication evidence is recorded below after the release completes.
+
+Release preparation also found the previous main-branch CI run failed because the shared HTTP stub could route a late request from an earlier session into the next test. Fixtures now retain their own session identifier, handler, and request log; a regression checks both response and request-count isolation. The updated local run passes 33 tests with the StoreKit integration excluded. The full suite, including that integration, must pass on a clean GitHub runner before publication. Installed-app confirmation and accessibility on supported macOS versions remain manual acceptance checks.
