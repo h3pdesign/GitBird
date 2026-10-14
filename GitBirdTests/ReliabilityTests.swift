@@ -681,6 +681,15 @@ final class ReliabilityTests: XCTestCase {
                     if let found = find(child, depth: depth + 1) { return found }
                 }
             }
+            // In-process macOS 26 scroll containers may omit their document
+            // from AX relationships even though its native controls are laid
+            // out. Inspect visible test-owned AppKit descendants too. This
+            // dispatch test does not certify VoiceOver traversal or speech.
+            if let view = element as? NSView, !view.isHiddenOrHasHiddenAncestor {
+                for child in view.subviews where !child.isHiddenOrHasHiddenAncestor && !child.visibleRect.isEmpty {
+                    if let found = find(child, depth: depth + 1) { return found }
+                }
+            }
             return nil
         }
         for root in roots { if let found = find(root, depth: 0) { return found } }
