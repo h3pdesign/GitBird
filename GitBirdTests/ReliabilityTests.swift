@@ -472,8 +472,12 @@ final class ReliabilityTests: XCTestCase {
             let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = host
+            NSApp.activate()
             window.makeKeyAndOrderFront(nil)
             defer { window.close(); data.stop() }
+            host.frame = window.contentLayoutRect
+            host.layoutSubtreeIfNeeded()
+            window.displayIfNeeded()
             let roots: [Any] = [host, window]
             let title = provider == .gitlab ? "Complete Todo" : "Mark as read"
             await eventually { self.accessibilityButton(named: title, roots: roots) != nil }
@@ -482,7 +486,7 @@ final class ReliabilityTests: XCTestCase {
                 XCTAssertNil(accessibilityButton(named: "bulkDone", roots: roots), "GitLab has one bulk completion action")
                 XCTAssertNil(accessibilityButton(named: "Mark as done", roots: roots), "Todo completion is not duplicated in each row")
             }
-            let action = try XCTUnwrap(accessibilityButton(named: title, roots: roots))
+            let action = try XCTUnwrap(accessibilityButton(named: title, roots: roots), accessibilityTreeDescription(roots: roots))
             XCTAssertTrue(pressAccessibilityButton(action))
             await eventually { data.notifications.isEmpty }
             XCTAssertEqual(data.errorMessage, "")
@@ -504,8 +508,12 @@ final class ReliabilityTests: XCTestCase {
         let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 260), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
+        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         defer { window.close() }
+        host.frame = window.contentLayoutRect
+        host.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
         let roots: [Any] = [host, window]
         let title = "organisation/repository: Search regression"
         await eventually { self.accessibilityButton(named: title, roots: roots) != nil }
@@ -525,12 +533,16 @@ final class ReliabilityTests: XCTestCase {
         let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
+        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         defer { window.close(); data.stop() }
+        host.frame = window.contentLayoutRect
+        host.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
         let roots: [Any] = [host, window]
         await eventually { self.accessibilityButton(named: "Retry refresh", roots: roots) != nil }
         let before = ProviderStub.state.snapshot().count
-        XCTAssertTrue(pressAccessibilityButton(try XCTUnwrap(accessibilityButton(named: "Retry refresh", roots: roots))))
+        XCTAssertTrue(pressAccessibilityButton(try XCTUnwrap(accessibilityButton(named: "Retry refresh", roots: roots), accessibilityTreeDescription(roots: roots))))
         XCTAssertTrue(data.statusMessage.contains("retry interval"))
         XCTAssertEqual(ProviderStub.state.snapshot().count, before)
         XCTAssertEqual(data.notifications.count, 1)
@@ -550,8 +562,12 @@ final class ReliabilityTests: XCTestCase {
         let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
+        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         defer { window.close(); data.stop() }
+        host.frame = window.contentLayoutRect
+        host.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
         let roots: [Any] = [host, window]
         let context = try XCTUnwrap(data.prepareBulkAction(.read))
         data.performBulkAction(context)
@@ -560,7 +576,7 @@ final class ReliabilityTests: XCTestCase {
         await Task.yield()
         let refresh = try XCTUnwrap(accessibilityButton(named: "Refresh notifications", roots: roots))
         _ = pressAccessibilityButton(refresh)
-        let inlineRetry = try XCTUnwrap(accessibilityButton(named: "Retry refresh", roots: roots))
+        let inlineRetry = try XCTUnwrap(accessibilityButton(named: "Retry refresh", roots: roots), accessibilityTreeDescription(roots: roots))
         _ = pressAccessibilityButton(inlineRetry)
         let retainedBusyState = data.isPerformingBulkAction
         await gate.open()
