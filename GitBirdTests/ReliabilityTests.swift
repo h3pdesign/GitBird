@@ -668,12 +668,18 @@ final class ReliabilityTests: XCTestCase {
             guard node.responds(to: selector) else { return nil }
             return node.perform(selector)?.takeUnretainedValue()
         }
+        var visited = Set<ObjectIdentifier>()
         func find(_ node: Any, depth: Int) -> NSObject? {
-            guard depth < 20, let element = node as? NSObject else { return nil }
+            guard depth < 20, let element = node as? NSObject,
+                  visited.insert(ObjectIdentifier(element)).inserted else { return nil }
             if attribute(element, "accessibilityRole") as? String == "AXButton",
                attribute(element, "accessibilityLabel") as? String == name || attribute(element, "accessibilityTitle") as? String == name || attribute(element, "accessibilityIdentifier") as? String == name { return element }
-            for child in attribute(element, "accessibilityChildren") as? [Any] ?? [] {
-                if let found = find(child, depth: depth + 1) { return found }
+            // AppKit containers can expose their content separately from the
+            // regular child array (notably scroll views on macOS 26).
+            for relationship in ["accessibilityChildren", "accessibilityContents", "accessibilityChildrenInNavigationOrder"] {
+                for child in attribute(element, relationship) as? [Any] ?? [] {
+                    if let found = find(child, depth: depth + 1) { return found }
+                }
             }
             return nil
         }
@@ -691,15 +697,18 @@ final class ReliabilityTests: XCTestCase {
     }
 
     private func accessibilityTreeDescription(roots: [Any]) -> String {
+        var visited = Set<ObjectIdentifier>()
         func describe(_ node: Any, depth: Int) -> String {
-            guard depth < 8, let element = node as? NSObject else { return "" }
+            guard depth < 12, let element = node as? NSObject,
+                  visited.insert(ObjectIdentifier(element)).inserted else { return "" }
             func attribute(_ name: String) -> Any? {
                 let selector = NSSelectorFromString(name)
                 guard element.responds(to: selector) else { return nil }
                 return element.perform(selector)?.takeUnretainedValue()
             }
             let attributes = ["accessibilityRole", "accessibilityLabel", "accessibilityTitle", "accessibilityIdentifier"].map { String(describing: attribute($0)) }
-            let children = attribute("accessibilityChildren") as? [Any] ?? []
+            let children = ["accessibilityChildren", "accessibilityContents", "accessibilityChildrenInNavigationOrder"]
+                .flatMap { attribute($0) as? [Any] ?? [] }
             return "\(type(of: element)) \(attributes)\n" + children.map { describe($0, depth: depth + 1) }.joined()
         }
         return String(roots.map { describe($0, depth: 0) }.joined().prefix(6000))
