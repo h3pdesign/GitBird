@@ -13,7 +13,6 @@ struct ContentView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityEnabled) private var accessibilityEnabled
 
     @AppStorage("settingsSection") private var settingsSection = "general"
     @State private var searchText = ""
@@ -346,13 +345,15 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                // There are only three date groups; an eager container keeps
+                // their native controls in a stable accessibility hierarchy.
+                VStack(alignment: .leading, spacing: 2) {
                     if !runtimeData.errorMessage.isEmpty {
                         errorNotice
                             .padding(.bottom, 10)
                     }
                     if notificationGroups.isEmpty {
-                        Text("No loaded notifications match your search.")
+                        Text("No loaded notifications match your filters.")
                             .foregroundStyle(.secondary)
                             .padding(.vertical, 12)
                     }
@@ -427,9 +428,6 @@ struct ContentView: View {
                 .padding(.vertical, 2)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Loaded notifications")
-                // Preserve the host's accessibility state across the native
-                // scroll-document boundary on older supported macOS releases.
-                .environment(\.accessibilityEnabled, accessibilityEnabled)
             }
             .frame(minHeight: 140, maxHeight: .infinity)
         }
