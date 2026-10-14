@@ -345,9 +345,7 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             ScrollView {
-                // There are only three date groups; an eager container keeps
-                // their native controls in a stable accessibility hierarchy.
-                VStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     if !runtimeData.errorMessage.isEmpty {
                         errorNotice
                             .padding(.bottom, 10)
@@ -426,8 +424,6 @@ struct ContentView: View {
                     }
                 }
                 .padding(.vertical, 2)
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Loaded notifications")
             }
             .frame(minHeight: 140, maxHeight: .infinity)
         }

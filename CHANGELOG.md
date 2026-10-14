@@ -18,7 +18,7 @@ All notable changes to GitBird are documented here.
 - Coordinate refresh, pagination, settings changes, polling, and mutations so delayed responses cannot restore completed notifications or discard action results.
 - Revisit offset pages after removals and invalidate cached detail URLs when subject metadata changes.
 - Anchor modern macOS purchase confirmation to the app window while retaining the macOS 14.6 fallback.
-- Provide an opaque popup surface when Reduce Transparency is enabled and an explicit accessibility container for loaded notification controls.
+- Provide an opaque popup surface when Reduce Transparency is enabled.
 
 ### Refined
 

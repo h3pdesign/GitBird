@@ -468,10 +468,11 @@ final class ReliabilityTests: XCTestCase {
             await eventually { data.lastPull != nil }
             data.notifications = [try Self.thread(provider: provider)]
             data.errorMessage = "The last refresh failed."
-            let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
+            let controller = NSHostingController(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
+            let host = controller.view
             let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
-            window.contentView = host
+            window.contentViewController = controller
             NSApp.activate()
             window.makeKeyAndOrderFront(nil)
             defer { window.close(); data.stop() }
@@ -529,10 +530,11 @@ final class ReliabilityTests: XCTestCase {
         await data.loadCredentials()
         await eventually { data.errorMessage.contains("rate limiting") }
         data.notifications = [try Self.thread()]
-        let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
+        let controller = NSHostingController(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
+        let host = controller.view
         let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.contentView = host
+        window.contentViewController = controller
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         defer { window.close(); data.stop() }
@@ -558,10 +560,11 @@ final class ReliabilityTests: XCTestCase {
         await eventually { data.lastPull != nil }
         data.notifications = [try Self.thread()]
         data.errorMessage = "An earlier refresh failed."
-        let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
+        let controller = NSHostingController(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
+        let host = controller.view
         let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.contentView = host
+        window.contentViewController = controller
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         defer { window.close(); data.stop() }
@@ -708,7 +711,7 @@ final class ReliabilityTests: XCTestCase {
     private func accessibilityTreeDescription(roots: [Any]) -> String {
         func viewFrames(_ view: NSView, depth: Int) -> String {
             guard depth < 10 else { return "" }
-            return "\(type(of: view)) frame=\(view.frame) bounds=\(view.bounds) hidden=\(view.isHidden)\n"
+            return "\(type(of: view)) frame=\(view.frame) bounds=\(view.bounds) hidden=\(view.isHidden) role=\(String(describing: view.accessibilityRole())) label=\(view.accessibilityLabel() ?? "") title=\(view.accessibilityTitle() ?? "")\n"
                 + view.subviews.map { viewFrames($0, depth: depth + 1) }.joined()
         }
         let layout = roots.compactMap { $0 as? NSView }.map { viewFrames($0, depth: 0) }.joined()
