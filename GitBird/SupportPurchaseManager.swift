@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Observation
 import StoreKit
 
@@ -93,7 +94,14 @@ final class SupportPurchaseManager {
         loadTask = nil
     }
 
-    func purchase(using purchase: @MainActor (Product) async throws -> Product.PurchaseResult = { try await $0.purchase() }) async {
+    static func purchaseProduct(_ product: Product) async throws -> Product.PurchaseResult {
+        if #available(macOS 15.2, *), let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            return try await product.purchase(confirmIn: window)
+        }
+        return try await product.purchase()
+    }
+
+    func purchase(using purchase: @MainActor (Product) async throws -> Product.PurchaseResult = { try await SupportPurchaseManager.purchaseProduct($0) }) async {
         guard !isPurchasing else { return }
         isPurchasing = true
         defer { isPurchasing = false }

@@ -4,6 +4,30 @@ All notable changes to GitBird are documented here.
 
 ## Unreleased
 
+## [2.1.8] - 2026-10-14
+
+### Added
+
+- Per-item request progress with duplicate-action protection and independent actions on other rows.
+- Local mention, review-request, and repository filters with loaded-scope counts and clear controls.
+- Manual Check for updates link in About, alongside the installed version.
+
+### Fixed
+
+- Preserve freshness while temporary success feedback expires; older expiry tasks cannot clear newer messages.
+- Coordinate refresh, pagination, settings changes, polling, and mutations so delayed responses cannot restore completed notifications or discard action results.
+- Revisit offset pages after removals and invalidate cached detail URLs when subject metadata changes.
+- Anchor modern macOS purchase confirmation to the app window while retaining the macOS 14.6 fallback.
+- Provide an opaque popup surface when Reduce Transparency is enabled.
+
+### Refined
+
+- Separate labeled bulk actions from the compact navigation controls, and identify the selected provider.
+- Show one GitLab Todo completion action with Pending/Completed terminology.
+- Keep cached notifications visible during refresh/action failures, with inline recovery controls that respect provider retry delays.
+- Use native notification-opening buttons and visible read/done actions; missing detail URLs no longer disable provider actions.
+- Show a checking state before the first successful fetch and prevent manual refresh from invalidating a running bulk action.
+
 ## [2.1.7] - 2026-10-09
 
 ### Fixed

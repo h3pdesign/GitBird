@@ -144,7 +144,14 @@ final class ReliabilityTests: XCTestCase {
         configuration.protocolClasses = [ProviderStub.self]
         configuration.httpAdditionalHeaders = [StubState.sessionHeader: id]
         let session = URLSession(configuration: configuration)
-        addTeardownBlock { session.invalidateAndCancel(); ProviderStub.state.remove(id) }
+        addTeardownBlock {
+            // RuntimeData's cancelled tasks can still be unwinding after stop.
+            // Cancel active requests, but let their session outlive them: an
+            // invalidated URLSession raises an Objective-C exception if a late
+            // cancelled viewer lookup reaches it during teardown.
+            for task in await session.allTasks { task.cancel() }
+            ProviderStub.state.remove(id)
+        }
         return session
     }
 
@@ -452,9 +459,122 @@ final class ReliabilityTests: XCTestCase {
         try await exerciseBulkConfirmation(inPopover: true, cancel: true, keyboard: true)
     }
 
+    func testCachedRowsStayActionableAfterErrorsWithoutDetailURLsOrHover() async throws {
+        for provider in NotificationProvider.allCases {
+            let data = RuntimeData(defaults: defaults(provider: provider), credentials: MemoryCredentials(["github": "test-token", "gitlab:https://gitlab.example": "test-token"]), apiSession: session { request in
+                request.httpMethod == "GET" ? StubReply() : StubReply(205)
+            })
+            await data.loadCredentials()
+            await eventually { data.lastPull != nil }
+            data.notifications = [try Self.thread(provider: provider)]
+            data.errorMessage = "The last refresh failed."
+            let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true))
+            let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            window.makeKeyAndOrderFront(nil)
+            defer { window.close(); data.stop() }
+            let roots: [Any] = [host, window]
+            let title = provider == .gitlab ? "Complete Todo" : "Mark as read"
+            await eventually { self.accessibilityButton(named: title, roots: roots) != nil }
+            XCTAssertNotNil(accessibilityButton(named: "Retry refresh", roots: roots))
+            if provider == .gitlab {
+                XCTAssertNil(accessibilityButton(named: "bulkDone", roots: roots), "GitLab has one bulk completion action")
+                XCTAssertNil(accessibilityButton(named: "Mark as done", roots: roots), "Todo completion is not duplicated in each row")
+            }
+            let action = try XCTUnwrap(accessibilityButton(named: title, roots: roots))
+            XCTAssertTrue(pressAccessibilityButton(action))
+            await eventually { data.notifications.isEmpty }
+            XCTAssertEqual(data.errorMessage, "")
+            let mutations = ProviderStub.state.snapshot().filter { $0.httpMethod != "GET" }
+            XCTAssertEqual(mutations.count, 1)
+            XCTAssertEqual(mutations.first?.httpMethod, provider == .gitlab ? "POST" : "PATCH")
+        }
+    }
+
+    func testNativeRowOpenButtonDispatchesOnlyBrowserAction() async throws {
+        let thread = try Self.thread()
+        let destination = try XCTUnwrap(URL(string: "https://github.com/organisation/repository/issues/1"))
+        var opened: URL?
+        var mutations = 0
+        let row = NotificationRowView(thread: thread, details: GitHubSubjectDetails(htmlUrl: destination, participants: []),
+            onOpen: { _, url in opened = url }, onMarkAsDone: { _ in mutations += 1 }, onMarkAsRead: { _ in mutations += 1 },
+            provider: .github, allowedAvatarHosts: [])
+        let host = NSHostingView(rootView: row.environment(\.accessibilityEnabled, true))
+        let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 260), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        defer { window.close() }
+        let roots: [Any] = [host, window]
+        let title = "organisation/repository: Search regression"
+        await eventually { self.accessibilityButton(named: title, roots: roots) != nil }
+        XCTAssertTrue(pressAccessibilityButton(try XCTUnwrap(accessibilityButton(named: title, roots: roots))))
+        XCTAssertEqual(opened, destination)
+        XCTAssertEqual(mutations, 0)
+    }
+
+    func testInlineRetryRefreshRespectsProviderDelayAndKeepsCachedItems() async throws {
+        let data = RuntimeData(defaults: defaults(), credentials: MemoryCredentials(["github": "test-token"]), apiSession: session { request in
+            request.url?.path == "/notifications" ? StubReply(429, headers: ["Retry-After": "120"]) : StubReply()
+        })
+        await data.loadCredentials()
+        await eventually { data.errorMessage.contains("rate limiting") }
+        data.notifications = [try Self.thread()]
+        let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true))
+        let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        defer { window.close(); data.stop() }
+        let roots: [Any] = [host, window]
+        await eventually { self.accessibilityButton(named: "Retry refresh", roots: roots) != nil }
+        let before = ProviderStub.state.snapshot().count
+        XCTAssertTrue(pressAccessibilityButton(try XCTUnwrap(accessibilityButton(named: "Retry refresh", roots: roots))))
+        XCTAssertTrue(data.statusMessage.contains("retry interval"))
+        XCTAssertEqual(ProviderStub.state.snapshot().count, before)
+        XCTAssertEqual(data.notifications.count, 1)
+    }
+
+    func testRefreshControlCannotDiscardAnInFlightBulkResult() async throws {
+        let gate = RequestGate()
+        let data = RuntimeData(defaults: defaults(), credentials: MemoryCredentials(["github": "test-token"]), apiSession: session { request in
+            if request.httpMethod == "PUT" { await gate.wait() }
+            return StubReply()
+        })
+        await data.loadCredentials()
+        await eventually { data.lastPull != nil }
+        data.notifications = [try Self.thread()]
+        data.errorMessage = "An earlier refresh failed."
+        let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true))
+        let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        defer { window.close(); data.stop() }
+        let roots: [Any] = [host, window]
+        let context = try XCTUnwrap(data.prepareBulkAction(.read))
+        data.performBulkAction(context)
+        await eventually { ProviderStub.state.snapshot().contains { $0.httpMethod == "PUT" } }
+        // Give SwiftUI a run-loop turn to apply the busy state to the control.
+        await Task.yield()
+        let refresh = try XCTUnwrap(accessibilityButton(named: "Refresh notifications", roots: roots))
+        _ = pressAccessibilityButton(refresh)
+        let inlineRetry = try XCTUnwrap(accessibilityButton(named: "Retry refresh", roots: roots))
+        _ = pressAccessibilityButton(inlineRetry)
+        let retainedBusyState = data.isPerformingBulkAction
+        await gate.open()
+        XCTAssertTrue(retainedBusyState, "Refresh must not invalidate the in-flight action's request generation")
+        await eventually { !data.isPerformingBulkAction && data.notifications.isEmpty }
+        XCTAssertEqual(ProviderStub.state.snapshot().filter { $0.url?.path == "/notifications" && $0.httpMethod == "GET" }.count, 1)
+    }
+
     private func exerciseBulkConfirmation(inPopover: Bool, cancel: Bool, keyboard: Bool = false) async throws {
         for provider in NotificationProvider.allCases {
-            for kind in [BulkActionContext.Kind.read, .done] {
+            // GitLab exposes one completion action; both model aliases remain
+            // covered by the provider-level scope and failure tests.
+            let kinds: [BulkActionContext.Kind] = provider == .gitlab ? [.read] : [.read, .done]
+            for kind in kinds {
                 let data = RuntimeData(defaults: defaults(provider: provider), credentials: MemoryCredentials(["github": "test-token", "gitlab:https://gitlab.example": "test-token"]), apiSession: session { request in
                     request.httpMethod == "GET" ? StubReply() : StubReply(205)
                 })
@@ -739,6 +859,158 @@ final class ReliabilityTests: XCTestCase {
         }
     }
 
+    func testStatusExpiryCannotClearNewerIdenticalFeedback() {
+        let data = RuntimeData(defaults: defaults(), credentials: MemoryCredentials(), apiSession: session())
+        data.lastPull = Date(timeIntervalSince1970: 1_700_000_000)
+        data.statusMessage = "Marked as read"
+        let oldRevision = data.statusMessageRevision
+        data.statusMessage = "Marked as read"
+        let newRevision = data.statusMessageRevision
+        data.clearStatusMessage(ifRevision: oldRevision)
+        XCTAssertEqual(data.statusMessage, "Marked as read")
+        data.clearStatusMessage(ifRevision: newRevision)
+        XCTAssertEqual(data.statusMessage, "")
+        XCTAssertEqual(data.lastPull, Date(timeIntervalSince1970: 1_700_000_000))
+        data.stop()
+    }
+
+    func testLoadedFiltersComposeReasonRepositoryAndSearchWithoutRequests() throws {
+        let fixtures = [try Self.thread(id: "1", reason: "mention"),
+                        try Self.thread(id: "2", reason: "team_mention", repository: "other/project"),
+                        try Self.thread(id: "3", reason: "review_requested"),
+                        try Self.thread(id: "4", reason: "subscribed")]
+        _ = session()
+        XCTAssertEqual(fixtures.filter { $0.matches(search: "", filter: .mentions, repository: "", provider: .github) }.map(\.id), ["1", "2"])
+        XCTAssertEqual(fixtures.filter { $0.matches(search: "SEARCH", filter: .mentions, repository: "other/project", provider: .github) }.map(\.id), ["2"])
+        XCTAssertEqual(fixtures.filter { $0.matches(search: "", filter: .reviewRequested, repository: "", provider: .github) }.map(\.id), ["3"])
+        XCTAssertTrue(fixtures.filter { $0.matches(search: "no match", filter: .all, repository: "", provider: .github) }.isEmpty)
+        XCTAssertEqual(NotificationFilter.available(for: .gitlab), [.all])
+        XCTAssertTrue(NotificationFilter.mentions.matches(fixtures[3], provider: .gitlab), "Provider switching must not leave an incompatible hidden filter")
+        XCTAssertTrue(ProviderStub.state.snapshot().isEmpty)
+    }
+
+    func testIndividualProgressAllowsOtherRowsAndRecoversOnFailure() async throws {
+        let gate = RequestGate()
+        let data = RuntimeData(defaults: defaults(), credentials: MemoryCredentials(["github": "test-token"]), apiSession: session { request in
+            if request.httpMethod == "PATCH", request.url?.path.hasSuffix("/1") == true {
+                await gate.wait()
+                return StubReply(401)
+            }
+            return request.httpMethod == "GET" ? StubReply() : StubReply(205)
+        })
+        await data.loadCredentials()
+        await eventually { data.lastPull != nil }
+        data.notifications = [try Self.thread(), try Self.thread(id: "2")]
+        data.markNotificationAsRead(threadId: "1")
+        XCTAssertTrue(data.isPerformingAction(for: "1"))
+        XCTAssertFalse(data.isPerformingAction(for: "2"))
+        XCTAssertNil(data.prepareBulkAction(.done))
+        data.markNotificationAsRead(threadId: "1")
+        data.markNotificationAsRead(threadId: "2")
+        await eventually { !data.notifications.contains { $0.id == "2" } }
+        await gate.open()
+        await eventually { !data.isPerformingAnyAction && !data.errorMessage.isEmpty }
+        XCTAssertEqual(data.notifications.map(\.id), ["1"])
+        XCTAssertEqual(ProviderStub.state.snapshot().filter { $0.httpMethod == "PATCH" }.count, 2)
+        data.stop()
+    }
+
+    func testSettingsChangesWaitForMutationAndManualRefreshCannotDiscardIt() async throws {
+        let gate = RequestGate()
+        let data = RuntimeData(defaults: defaults(), credentials: MemoryCredentials(["github": "test-token"]), apiSession: session { request in
+            if request.httpMethod == "DELETE" { await gate.wait() }
+            return request.httpMethod == "GET" ? StubReply() : StubReply(205)
+        })
+        await data.loadCredentials()
+        await eventually { data.lastPull != nil }
+        data.notifications = [try Self.thread()]
+        data.markNotificationAsDone(threadId: "1")
+        data.listLength = 20
+        data.interval = 60
+        data.refreshNotifications()
+        XCTAssertTrue(data.isPerformingAction(for: "1"))
+        XCTAssertFalse(data.isRefreshing)
+        await gate.open()
+        await eventually { !data.isPerformingAnyAction && data.notifications.isEmpty }
+        await eventually { ProviderStub.state.snapshot().filter { $0.url?.path == "/notifications" }.count == 2 }
+        XCTAssertTrue(ProviderStub.state.snapshot().contains { request in
+            guard let url = request.url, url.path == "/notifications" else { return false }
+            return URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains(URLQueryItem(name: "per_page", value: "20")) == true
+        })
+        data.stop()
+    }
+
+    func testOlderPollCannotRestoreACompletedNotification() async throws {
+        let gate = RequestGate()
+        let payload = try Self.payload([Self.thread()])
+        let data = RuntimeData(defaults: defaults(), credentials: MemoryCredentials(["github": "test-token"]), apiSession: session { request in
+            if request.url?.path == "/notifications", request.httpMethod == "GET" {
+                let count = ProviderStub.state.snapshot().filter { $0.url?.path == "/notifications" }.count
+                if count == 1 { await gate.wait(); return StubReply(body: payload) }
+            }
+            return request.httpMethod == "GET" ? StubReply() : StubReply(205)
+        })
+        await data.loadCredentials()
+        await eventually { ProviderStub.state.snapshot().contains { $0.url?.path == "/notifications" } }
+        data.notifications = [try Self.thread()]
+        data.lastPull = Date(timeIntervalSince1970: 1_700_000_000)
+        data.markNotificationAsDone(threadId: "1")
+        await eventually { !data.isPerformingAnyAction && data.notifications.isEmpty }
+        await gate.open()
+        await eventually { ProviderStub.state.snapshot().filter { $0.url?.path == "/notifications" }.count >= 2 && data.lastPull != Date(timeIntervalSince1970: 1_700_000_000) }
+        XCTAssertTrue(data.notifications.isEmpty)
+        data.stop()
+    }
+
+    func testMutationRebasesOffsetPaginationWithoutSkippingShiftedItems() async throws {
+        let first = try Self.payload([Self.thread()])
+        let second = try Self.payload([Self.thread(id: "2")])
+        let data = RuntimeData(defaults: defaults(), credentials: MemoryCredentials(["github": "test-token"]), apiSession: session { request in
+            if request.url?.path == "/notifications", request.httpMethod == "GET" {
+                let count = ProviderStub.state.snapshot().filter { $0.url?.path == "/notifications" }.count
+                return count == 1 ? StubReply(headers: ["Link": "<https://api.github.com/notifications?page=2>; rel=\"next\""], body: first) : StubReply(body: second)
+            }
+            return request.httpMethod == "GET" ? StubReply() : StubReply(205)
+        })
+        await data.loadCredentials()
+        await eventually { data.hasMoreNotifications }
+        data.markNotificationAsDone(threadId: "1")
+        await eventually { !data.isPerformingAnyAction && data.notifications.isEmpty }
+        data.loadMoreNotifications()
+        await eventually { data.notifications.map(\.id) == ["2"] }
+        let request = try XCTUnwrap(ProviderStub.state.snapshot().last { $0.url?.path == "/notifications" })
+        XCTAssertTrue(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)?.queryItems?.contains(URLQueryItem(name: "page", value: "1")) == true)
+        data.stop()
+    }
+
+    func testRefreshUpdatesRepositoryAndInvalidatesChangedDetailURL() async throws {
+        let oldURL = try XCTUnwrap(URL(string: "https://api.github.com/repos/org/old/issues/1"))
+        let newURL = try XCTUnwrap(URL(string: "https://api.github.com/repos/org/new/issues/1"))
+        let first = try Self.payload([Self.thread(repository: "org/old", subjectURL: oldURL)])
+        let second = try Self.payload([Self.thread(repository: "org/new", subjectURL: newURL)])
+        let data = RuntimeData(defaults: defaults(), credentials: MemoryCredentials(["github": "test-token"]), apiSession: session { request in
+            if request.url?.path == "/notifications" {
+                return StubReply(body: ProviderStub.state.snapshot().filter { $0.url?.path == "/notifications" }.count == 1 ? first : second)
+            }
+            return StubReply()
+        })
+        await data.loadCredentials()
+        await eventually { data.lastPull != nil }
+        data.subjectDetailsByThreadId["1"] = GitHubSubjectDetails(htmlUrl: oldURL, participants: [])
+        data.refreshNotifications()
+        await eventually { !data.isRefreshing && data.notifications.first?.repository.fullName == "org/new" }
+        XCTAssertEqual(data.notifications.first?.subject.url, newURL)
+        XCTAssertNil(data.subjectDetailsByThreadId["1"])
+        data.stop()
+    }
+
+    nonisolated private static func payload(_ threads: [GitHubNotificationThread]) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .iso8601
+        return String(decoding: try encoder.encode(threads), as: UTF8.self)
+    }
+
     func testSearchMatchesTitleRepositoryAndReasonWithoutNetwork() throws {
         let thread = try Self.thread()
         for query in ["", "  ", "SEARCH", "organisation", "review_requested"] { XCTAssertTrue(thread.matchesSearch(query)) }
@@ -751,9 +1023,9 @@ final class ReliabilityTests: XCTestCase {
         """
     }
 
-    nonisolated private static func thread(provider: NotificationProvider = .github, id: String = "1", updatedAt: Date = Date(timeIntervalSince1970: 1_700_000_000)) throws -> GitHubNotificationThread {
-        GitHubNotificationThread(id: id, repository: GitHubRepository(fullName: "organisation/repository", owner: nil),
-            subject: .init(title: "Search regression", type: "Issue", url: nil, latestCommentUrl: nil), reason: "review_requested", unread: true,
+    nonisolated private static func thread(provider: NotificationProvider = .github, id: String = "1", updatedAt: Date = Date(timeIntervalSince1970: 1_700_000_000), reason: String = "review_requested", repository: String = "organisation/repository", subjectURL: URL? = nil) throws -> GitHubNotificationThread {
+        GitHubNotificationThread(id: id, repository: GitHubRepository(fullName: repository, owner: nil),
+            subject: .init(title: "Search regression", type: "Issue", url: subjectURL, latestCommentUrl: nil), reason: reason, unread: true,
             updatedAt: updatedAt, lastReadAt: nil, url: URL(string: provider == .github ? "https://api.github.com/notifications/threads/\(id)" : "https://gitlab.example/api/v4/todos/\(id)")!, subscriptionUrl: nil)
     }
 }

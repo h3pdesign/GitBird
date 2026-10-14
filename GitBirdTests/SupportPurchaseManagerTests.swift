@@ -1,6 +1,7 @@
 import XCTest
 import StoreKit
 import StoreKitTest
+import AppKit
 @testable import GitBird
 
 @MainActor
@@ -77,6 +78,11 @@ final class SupportPurchaseManagerTests: XCTestCase {
         session.disableDialogs = true
         session.clearTransactions()
         defer { session.clearTransactions() }
+        let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 400, height: 250), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        defer { window.close() }
         let manager = SupportPurchaseManager(paymentAvailability: { true })
         manager.start()
         await manager.refresh()
@@ -96,8 +102,9 @@ final class SupportPurchaseManagerTests: XCTestCase {
 
         var purchasedIDs: [UInt64] = []
         let purchase: @MainActor (Product) async throws -> Product.PurchaseResult = { product in
-            let result = try await product.purchase()
+            let result = try await SupportPurchaseManager.purchaseProduct(product)
             if case .success(.verified(let transaction)) = result {
+                XCTAssertEqual(transaction.environment, .xcode, "Local tests must not route purchases to the App Store sandbox")
                 purchasedIDs.append(transaction.id)
             }
             return result

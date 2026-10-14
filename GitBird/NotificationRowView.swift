@@ -8,7 +8,9 @@ struct NotificationRowView: View {
     let onOpen: (GitHubNotificationThread, URL) -> Void
     let onMarkAsDone: (GitHubNotificationThread) -> Void
     let onMarkAsRead: (GitHubNotificationThread) -> Void
-    let readActionTitle: String
+    let provider: NotificationProvider
+    var isPerformingAction = false
+    var actionsDisabled = false
     let allowedAvatarHosts: Set<String>
 
     @State private var isHovering = false
@@ -16,107 +18,52 @@ struct NotificationRowView: View {
     var body: some View {
         let url = details?.htmlUrl ?? thread.subject.preferredWebURL()
 
-        VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    ZStack {
-                        Image(systemName: subjectTypeIconName(thread.subject.type))
-                            .symbolRenderingMode(.hierarchical)
-                            .frame(width: 18)
-                            .foregroundStyle(subjectTypeColor)
-                    }
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                guard let url else { return }
+                onOpen(thread, url)
+            } label: {
+                notificationContent
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(url == nil)
+            .accessibilityLabel("\(thread.repository.fullName): \(thread.subject.title)")
+            .accessibilityValue(Text([stateBadge.title, reasonBadge?.title].compactMap { $0 }.joined(separator: ", ")))
+            .accessibilityHint(url == nil ? "Details unavailable" : "Opens notification in your browser")
+            .onKeyPress(.return) {
+                guard let url else { return .ignored }
+                onOpen(thread, url)
+                return .handled
+            }
 
-                    if thread.unread {
-                        Circle()
-                            .fill(LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
-                            .frame(width: 7, height: 7)
-                            .overlay {
-                                Circle()
-                                    .stroke(.white.opacity(0.7), lineWidth: 1)
-                            }
-                            .shadow(color: .blue.opacity(0.45), radius: 3)
-                    }
-
-                    Text(thread.repository.fullName)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    Spacer(minLength: 8)
-
-                    if isHovering {
-                        Button {
-                            onMarkAsDone(thread)
-                        } label: {
-                            Image(systemName: "archivebox.fill")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 25, height: 25)
-                                .background {
-                                    Circle()
-                                        .fill(LinearGradient(colors: [.orange, .yellow], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                }
-                                .overlay {
-                                    Circle()
-                                        .stroke(.white.opacity(0.65), lineWidth: 1)
-                                }
-                                .shadow(color: .orange.opacity(0.35), radius: 4, y: 1)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Mark as done")
-                        .help("Mark as done")
-                        .frame(width: 24, height: 24)
-                        .padding(.trailing, 2)
-                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
-
-                        Button {
-                            onMarkAsRead(thread)
-                        } label: {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 25, height: 25)
-                                .background {
-                                    Circle()
-                                        .fill(LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                }
-                                .overlay {
-                                    Circle()
-                                        .stroke(.white.opacity(0.65), lineWidth: 1)
-                                }
-                                .shadow(color: .green.opacity(0.35), radius: 4, y: 1)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(readActionTitle)
-                        .help(readActionTitle)
-                        .frame(width: 24, height: 24)
-                        .padding(.trailing, 2)
-                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                    }
-
-                    Text(thread.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                if isPerformingAction {
+                    ProgressView().controlSize(.small)
+                        .accessibilityLabel("Updating notification")
                 }
-
-                Text(thread.subject.title)
-                    .font(.body)
-                    .fontWeight(thread.unread ? .semibold : .regular)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                statusBadgeView
-
-                if let reasonBadge {
-                    Label(reasonBadge.title, systemImage: reasonBadge.symbolName)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(reasonBadge.color)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(reasonBadge.color.opacity(0.16), in: Capsule())
+                if thread.unread {
+                    Button {
+                        onMarkAsRead(thread)
+                    } label: {
+                        Label(readActionTitle, systemImage: "checkmark.circle")
+                    }
+                    .help(readActionTitle)
                 }
-
-                if !participants.isEmpty {
-                    AvatarStackView(users: participants, allowedHosts: allowedAvatarHosts)
+                if provider == .github {
+                    Button {
+                        onMarkAsDone(thread)
+                    } label: {
+                        Label("Mark as done", systemImage: "archivebox")
+                    }
+                    .help("Mark as done (Delete)")
                 }
+                Spacer(minLength: 0)
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .disabled(isPerformingAction || actionsDisabled)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
@@ -126,47 +73,77 @@ struct NotificationRowView: View {
             if isHovering {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(.primary.opacity(0.08))
-                    .transition(.opacity)
                     .allowsHitTesting(false)
             }
         }
-        .disabled(url == nil)
-        .onTapGesture {
-            guard let url else { return }
-            onOpen(thread, url)
-        }
-        .focusable()
-        .accessibilityLabel("\(thread.repository.fullName): \(thread.subject.title)")
-        .accessibilityHint(url == nil ? "Details unavailable" : "Opens notification in your browser")
-        .accessibilityAction {
-            guard let url else { return }
-            onOpen(thread, url)
-        }
-        .accessibilityAction(named: "Mark as done") {
-            onMarkAsDone(thread)
-        }
-        .accessibilityAction(named: Text(readActionTitle)) {
-            onMarkAsRead(thread)
-        }
-        .onKeyPress(.return) {
-            guard let url else { return .ignored }
-            onOpen(thread, url)
-            return .handled
-        }
-        .onKeyPress(.space) {
-            guard let url else { return .ignored }
-            onOpen(thread, url)
-            return .handled
-        }
         .onDeleteCommand {
-
+            guard !isPerformingAction, !actionsDisabled else { return }
             onMarkAsDone(thread)
         }
-        .help("Open notification. Press Delete to mark as done.")
-        .onHover { hovering in
-            isHovering = hovering
+        .onHover { isHovering = $0 }
+    }
+
+    private var readActionTitle: String {
+        provider == .gitlab ? "Complete Todo" : "Mark as read"
+    }
+
+    private var notificationContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                ZStack {
+                    Image(systemName: subjectTypeIconName(thread.subject.type))
+                        .symbolRenderingMode(.hierarchical)
+                        .frame(width: 18)
+                        .foregroundStyle(subjectTypeColor)
+                }
+
+                if thread.unread {
+                    Circle()
+                        .fill(LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 7, height: 7)
+                        .overlay {
+                            Circle()
+                                .stroke(.white.opacity(0.7), lineWidth: 1)
+                        }
+                        .shadow(color: .blue.opacity(0.45), radius: 3)
+                }
+
+                Text(thread.repository.fullName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(thread.repository.fullName)
+
+                Spacer(minLength: 8)
+
+                Text(thread.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(thread.subject.title)
+                .font(.body)
+                .fontWeight(thread.unread ? .semibold : .regular)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 6) {
+                statusBadgeView
+                if let reasonBadge {
+                    Label(reasonBadge.title, systemImage: reasonBadge.symbolName)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(reasonBadge.color)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(reasonBadge.color.opacity(0.16), in: Capsule())
+                }
+            }
+
+            if !participants.isEmpty {
+                AvatarStackView(users: participants, allowedHosts: allowedAvatarHosts)
+            }
         }
-        .animation(.easeOut(duration: 0.12), value: isHovering)
     }
 
     private var participants: [GitHubUser] {
@@ -234,9 +211,9 @@ struct NotificationRowView: View {
 
     private var stateBadge: StatusBadge {
         if thread.unread {
-            return StatusBadge(title: "Unread", symbolName: "circle.fill", color: .blue)
+            return StatusBadge(title: provider == .gitlab ? "Pending" : "Unread", symbolName: "circle.fill", color: .blue)
         }
-        return StatusBadge(title: "Read", symbolName: "checkmark.circle.fill", color: .secondary)
+        return StatusBadge(title: provider == .gitlab ? "Completed" : "Read", symbolName: "checkmark.circle.fill", color: .secondary)
     }
 
     private struct StatusBadge {

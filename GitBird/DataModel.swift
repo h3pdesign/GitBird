@@ -235,10 +235,38 @@ struct GitHubNotificationThread: Identifiable, Codable, Sendable {
 }
 
 extension GitHubNotificationThread {
+    func matches(search: String, filter: NotificationFilter, repository: String, provider: NotificationProvider) -> Bool {
+        matchesSearch(search) && (repository.isEmpty || self.repository.fullName == repository)
+            && filter.matches(self, provider: provider)
+    }
+
     func matchesSearch(_ query: String) -> Bool {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return query.isEmpty || subject.title.localizedStandardContains(query)
             || repository.fullName.localizedStandardContains(query) || reason.localizedStandardContains(query)
+    }
+}
+
+enum NotificationFilter: String, CaseIterable, Identifiable {
+    case all, mentions, reviewRequested
+    var id: Self { self }
+    var title: String {
+        switch self {
+        case .all: "All loaded"
+        case .mentions: "Mentions"
+        case .reviewRequested: "Review requested"
+        }
+    }
+    static func available(for provider: NotificationProvider) -> [Self] {
+        provider == .github ? allCases : [.all]
+    }
+    func matches(_ thread: GitHubNotificationThread, provider: NotificationProvider) -> Bool {
+        guard provider == .github else { return true }
+        switch self {
+        case .all: return true
+        case .mentions: return thread.reason == "mention" || thread.reason == "team_mention"
+        case .reviewRequested: return thread.reason == "review_requested"
+        }
     }
 }
 
@@ -759,7 +787,10 @@ struct BulkActionContext: Identifiable {
 @MainActor class RuntimeData: ObservableObject {
     static let shared = RuntimeData()
     @Published var errorMessage: String = ""
-    @Published var statusMessage: String = ""
+    @Published var statusMessage: String = "" {
+        didSet { statusMessageRevision &+= 1 }
+    }
+    @Published private(set) var statusMessageRevision = 0
     @Published var notifications: [GitHubNotificationThread] = []
     @Published var subjectDetailsByThreadId: [String: GitHubSubjectDetails] = [:]
 
@@ -778,7 +809,7 @@ struct BulkActionContext: Identifiable {
         }
         didSet(oldValue) {
             if listLength == oldValue { return }
-            resetPaginationState()
+            if !isPerformingAnyAction { resetPaginationState() }
             renewPullTask(interval: interval)
         }
     }
@@ -805,7 +836,7 @@ struct BulkActionContext: Identifiable {
         }
         didSet {
             if hideReadNotifications == oldValue { return }
-            resetPaginationState()
+            if !isPerformingAnyAction { resetPaginationState() }
             renewPullTask(interval: interval)
         }
     }
@@ -829,7 +860,9 @@ struct BulkActionContext: Identifiable {
     private var requestGeneration = 0
     private var nextProviderRequestAt: Date?
     private var retryBlockedUntil: Date?
-    private var actionTaskIDs = Set<String>()
+    @Published private var actionTaskIDs = Set<String>()
+    private var actionRevision = 0
+    private var deferredPollingInterval: Int?
     @Published var lastPull: Date?
 
     private var nextNotificationsPage: Int? = nil
@@ -949,6 +982,7 @@ struct BulkActionContext: Identifiable {
     }
 
     private func stopRequests() {
+        deferredPollingInterval = nil
         pullTask?.cancel()
         detailsTask?.cancel()
         loadMoreTask?.cancel()
@@ -1023,8 +1057,19 @@ struct BulkActionContext: Identifiable {
         guard lhs.count == rhs.count else { return true }
         return zip(lhs, rhs).contains { old, new in
             old.id != new.id || old.unread != new.unread || old.updatedAt != new.updatedAt ||
-            old.subject.title != new.subject.title || old.subject.type != new.subject.type || old.reason != new.reason
+            old.subject.title != new.subject.title || old.subject.type != new.subject.type || old.reason != new.reason ||
+            old.repository.fullName != new.repository.fullName || old.subject.url != new.subject.url ||
+            old.subject.latestCommentUrl != new.subject.latestCommentUrl || old.url != new.url
         }
+    }
+
+    private func applyFreshNotifications(_ threads: [GitHubNotificationThread]) {
+        subjectDetailsByThreadId = subjectDetailsByThreadId.filter { id, _ in
+            guard let previous = notifications.first(where: { $0.id == id }),
+                  let current = threads.first(where: { $0.id == id }) else { return false }
+            return previous.subject.url == current.subject.url
+        }
+        notifications = threads
     }
     
     func start() {
@@ -1046,6 +1091,10 @@ struct BulkActionContext: Identifiable {
     }
 
     func refreshNotifications() {
+        guard !isPerformingAnyAction else {
+            statusMessage = "Wait for the current action to finish before refreshing."
+            return
+        }
         if remainingProviderDelay > 0 {
             statusMessage = "Waiting for the provider’s retry interval. GitBird will retry automatically."
             return
@@ -1102,7 +1151,7 @@ struct BulkActionContext: Identifiable {
                 guard self.requestGeneration == generation else { return }
                 if ok {
                     if self.notificationsDiffer(self.notifications, firstPage) {
-                        self.notifications = firstPage
+                        self.applyFreshNotifications(firstPage)
                     }
                     self.lastPull = Date()
                 }
@@ -1127,6 +1176,10 @@ struct BulkActionContext: Identifiable {
     }
 
     func renewPullTask(interval: Int, initialDelay: TimeInterval = 0) {
+        guard !isPerformingAnyAction else {
+            deferredPollingInterval = interval
+            return
+        }
         AppLog.info("Renew pull task (interval=\(interval)s)")
         pullTask?.cancel()
         detailsTask?.cancel()
@@ -1174,6 +1227,14 @@ struct BulkActionContext: Identifiable {
                 let providerWait = await MainActor.run { [weak self] in self?.remainingProviderDelay ?? 0 }
                 if providerWait > 0 { try? await Task.sleep(for: .seconds(providerWait)) }
                 guard !Task.isCancelled else { return }
+                let actionState = await MainActor.run { [weak self] in
+                    (self?.isPerformingAnyAction ?? false, self?.actionRevision)
+                }
+                guard let actionRevision = actionState.1 else { return }
+                if actionState.0 {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    continue
+                }
                 AppLog.debug("Pull notifications (fails=\(failsCount))")
                 let result = await fetchNotificationThreads(
                     accessToken: token,
@@ -1193,14 +1254,15 @@ struct BulkActionContext: Identifiable {
                     AppLog.warning("Pull notifications failed: \(err)")
                 }
 
-                let shouldContinue = await MainActor.run { [weak self] in
-                    guard let self, self.requestGeneration == generation else { return false }
+                let (shouldContinue, needsResync) = await MainActor.run { [weak self] in
+                    guard let self, self.requestGeneration == generation else { return (false, false) }
                     self.honorProviderDelay(result.minimumPollDelay, failed: !ok)
+                    guard self.actionRevision == actionRevision, !self.isPerformingAnyAction else { return (true, true) }
                     self.errorMessage = ok ? "" : err
                     if ok {
                         let changed = self.notificationsDiffer(self.notifications, firstPage)
                         if changed {
-                            self.notifications = firstPage
+                            self.applyFreshNotifications(firstPage)
                         }
                         self.lastPull = Date()
                         self.nextNotificationsPage = hasNext ? 2 : nil
@@ -1214,10 +1276,11 @@ struct BulkActionContext: Identifiable {
                             self.prefetchSubjectDetails(for: Array(firstPage.prefix(12)))
                         }
                     }
-                    return true
+                    return (true, false)
                 }
 
                 guard shouldContinue else { return }
+                if needsResync { continue }
 
                 
                 if ok {
@@ -1238,6 +1301,7 @@ struct BulkActionContext: Identifiable {
     }
 
     func loadMoreNotifications() {
+        guard !isPerformingAnyAction, !isRefreshing else { return }
         if (retryBlockedUntil?.timeIntervalSinceNow ?? 0) > 0 {
             loadMoreError = "Waiting for the provider’s retry interval. Please try again later."
             return
@@ -1255,6 +1319,7 @@ struct BulkActionContext: Identifiable {
         let generation = requestGeneration
 
         isLoadingMoreNotifications = true
+        let actionRevision = self.actionRevision
         loadMoreError = ""
 
         loadMoreTask = Task.detached(priority: .utility) { [token, perPage, page, includeRead, provider, gitlabBaseURL, generation] in
@@ -1287,6 +1352,10 @@ struct BulkActionContext: Identifiable {
 
                 self.isLoadingMoreNotifications = false
                 self.honorProviderDelay(result.minimumPollDelay, failed: !ok)
+                guard self.actionRevision == actionRevision else {
+                    self.loadMoreError = "Notifications changed while loading. Choose Load more to try again."
+                    return
+                }
 
                 guard ok else {
                     self.loadMoreError = err
@@ -1383,8 +1452,9 @@ struct BulkActionContext: Identifiable {
 
     func markNotificationAsRead(threadId: String) {
         guard let thread = notifications.first(where: { $0.id == threadId }) else { return }
-        guard !activeToken.isEmpty, !isPerformingBulkAction else { return }
+        guard !activeToken.isEmpty, !isPerformingBulkAction, !isRefreshing else { return }
         guard mayPerformProviderAction(), actionTaskIDs.insert(threadId).inserted else { return }
+        actionRevision &+= 1
         let generation = requestGeneration
         let api = GitHubAPIClient(token: activeToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL), session: apiSession)
         Task.detached(priority: .utility) { [weak self] in
@@ -1401,6 +1471,8 @@ struct BulkActionContext: Identifiable {
                     self.subjectDetailsByThreadId.removeValue(forKey: threadId)
                     self.errorMessage = ""
                     self.statusMessage = self.provider == .gitlab ? "Completed Todo" : "Marked as read"
+                    if self.hideReadNotifications || self.provider == .gitlab { self.rebasePaginationAfterMutation() }
+                    self.resumeDeferredPolling()
                 }
             } catch {
                 AppLog.warning("Failed to mark notification as read")
@@ -1408,6 +1480,7 @@ struct BulkActionContext: Identifiable {
                     guard let self, self.requestGeneration == generation else { return }
                     self.actionTaskIDs.remove(threadId)
                     self.recordActionFailure(error, fallback: "Failed to mark as read")
+                    self.resumeDeferredPolling()
                 }
             }
         }
@@ -1415,8 +1488,9 @@ struct BulkActionContext: Identifiable {
 
     func markNotificationAsDone(threadId: String) {
         guard let thread = notifications.first(where: { candidate in candidate.id == threadId }) else { return }
-        guard !activeToken.isEmpty, !isPerformingBulkAction else { return }
+        guard !activeToken.isEmpty, !isPerformingBulkAction, !isRefreshing else { return }
         guard mayPerformProviderAction(), actionTaskIDs.insert(threadId).inserted else { return }
+        actionRevision &+= 1
         let generation = requestGeneration
         let api = GitHubAPIClient(token: activeToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL), session: apiSession)
         Task.detached(priority: .utility) { [weak self] in
@@ -1430,6 +1504,8 @@ struct BulkActionContext: Identifiable {
                     self.subjectDetailsByThreadId.removeValue(forKey: threadId)
                     self.errorMessage = ""
                     self.statusMessage = "Marked as done"
+                    self.rebasePaginationAfterMutation()
+                    self.resumeDeferredPolling()
                 }
             } catch {
                 AppLog.warning("Failed to mark notification as done")
@@ -1437,6 +1513,7 @@ struct BulkActionContext: Identifiable {
                     guard let self, self.requestGeneration == generation else { return }
                     self.actionTaskIDs.remove(threadId)
                     self.recordActionFailure(error, fallback: "Failed to mark as done")
+                    self.resumeDeferredPolling()
                 }
             }
         }
@@ -1462,8 +1539,30 @@ struct BulkActionContext: Identifiable {
     }
 
     var isPerformingBulkAction: Bool { isMarkingAllNotificationsAsRead || isMarkingAllNotificationsAsDone }
+    var isPerformingAnyAction: Bool { isPerformingBulkAction || !actionTaskIDs.isEmpty }
+    func isPerformingAction(for threadID: String) -> Bool { actionTaskIDs.contains(threadID) }
+
+    func clearStatusMessage(ifRevision revision: Int) {
+        guard statusMessageRevision == revision else { return }
+        statusMessage = ""
+    }
+
+    private func resumeDeferredPolling() {
+        guard !isPerformingAnyAction, let interval = deferredPollingInterval else { return }
+        deferredPollingInterval = nil
+        resetPaginationState()
+        renewPullTask(interval: interval)
+    }
+
+    private func rebasePaginationAfterMutation() {
+        // Provider pages use offsets. Removing an item shifts later items into
+        // earlier pages, so revisit page one and deduplicate on the next load.
+        if hasMoreNotifications { nextNotificationsPage = 1 }
+        loadMoreError = ""
+    }
 
     func prepareBulkAction(_ kind: BulkActionContext.Kind) -> BulkActionContext? {
+        guard !isPerformingAnyAction, !isRefreshing else { return nil }
         guard let account = credentialAccount, !activeToken.isEmpty, !notifications.isEmpty else { return nil }
         return BulkActionContext(kind: kind, provider: provider, account: account,
             generation: requestGeneration, threads: notifications, lastPull: lastPull)
@@ -1482,7 +1581,7 @@ struct BulkActionContext: Identifiable {
 
     func markAllNotificationsAsDone(context: BulkActionContext? = nil) {
         guard !notifications.isEmpty else { return }
-        guard !isPerformingBulkAction else { return }
+        guard !isPerformingAnyAction, !isRefreshing else { return }
         guard !activeToken.isEmpty else { return }
 
         guard mayPerformProviderAction() else { return }
@@ -1493,6 +1592,7 @@ struct BulkActionContext: Identifiable {
         let generation = requestGeneration
         let api = GitHubAPIClient(token: activeToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL), session: apiSession)
         isMarkingAllNotificationsAsDone = true
+        actionRevision &+= 1
 
         Task.detached(priority: .utility) { [weak self, targetIDs, targetURLs] in
             do {
@@ -1504,6 +1604,8 @@ struct BulkActionContext: Identifiable {
                     self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { !targetIDs.contains($0.key) }
                     self.errorMessage = ""
                     self.statusMessage = self.provider == .gitlab ? "Completed Todos" : "Marked loaded notifications as done"
+                    self.rebasePaginationAfterMutation()
+                    self.resumeDeferredPolling()
                 }
             } catch {
                 AppLog.warning("Failed to mark all notifications as done")
@@ -1511,6 +1613,7 @@ struct BulkActionContext: Identifiable {
                     guard let self, self.requestGeneration == generation else { return }
                     self.isMarkingAllNotificationsAsDone = false
                     self.recordActionFailure(error, fallback: "Failed to mark all as done")
+                    self.resumeDeferredPolling()
                 }
             }
         }
@@ -1518,7 +1621,7 @@ struct BulkActionContext: Identifiable {
 
     func markAllNotificationsAsRead(context: BulkActionContext? = nil) {
         guard !notifications.isEmpty else { return }
-        guard !isPerformingBulkAction else { return }
+        guard !isPerformingAnyAction, !isRefreshing else { return }
         guard !activeToken.isEmpty else { return }
 
         guard mayPerformProviderAction() else { return }
@@ -1535,6 +1638,7 @@ struct BulkActionContext: Identifiable {
         let generation = requestGeneration
         let api = GitHubAPIClient(token: activeToken, provider: provider, gitlabBaseURL: validatedGitLabBaseURL(gitlabBaseURL), session: apiSession)
         isMarkingAllNotificationsAsRead = true
+        actionRevision &+= 1
 
         Task.detached(priority: .utility) { [weak self, targetURLs] in
             do {
@@ -1549,7 +1653,9 @@ struct BulkActionContext: Identifiable {
                     self.subjectDetailsByThreadId = self.subjectDetailsByThreadId.filter { !targetIDs.contains($0.key) }
                     self.errorMessage = ""
                     self.statusMessage = self.provider == .gitlab ? "Completed Todos" : "Marked all as read"
+                    if self.hideReadNotifications || self.provider == .gitlab { self.rebasePaginationAfterMutation() }
                     self.isMarkingAllNotificationsAsRead = false
+                    self.resumeDeferredPolling()
                 }
             } catch {
                 AppLog.warning("Failed to mark all notifications as read")
@@ -1557,6 +1663,7 @@ struct BulkActionContext: Identifiable {
                     guard let self, self.requestGeneration == generation else { return }
                     self.isMarkingAllNotificationsAsRead = false
                     self.recordActionFailure(error, fallback: "Failed to mark all as read")
+                    self.resumeDeferredPolling()
                 }
             }
         }

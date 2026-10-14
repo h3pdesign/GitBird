@@ -328,7 +328,7 @@ private struct TokenSettingsView: View {
 
 private struct AboutSettingsView: View {
     private let repositoryURL = URL(string: "https://github.com/h3pdesign/GitBird")!
-    private let releasesURL = URL(string: "https://github.com/h3pdesign/GitBird/releases")!
+    private let releasesURL = URL(string: "https://github.com/h3pdesign/GitBird/releases/latest")!
     private let issuesURL = URL(string: "https://github.com/h3pdesign/GitBird/issues")!
     private let originalProjectURL = URL(string: "https://github.com/0x2E/GitStatus")!
     private let iconParkURL = URL(string: "https://github.com/bytedance/IconPark")!
@@ -351,8 +351,12 @@ private struct AboutSettingsView: View {
                             Label("GitBird repository", systemImage: "chevron.left.forwardslash.chevron.right")
                         }
                         Link(destination: releasesURL) {
-                            Label("Releases", systemImage: "shippingbox")
+                            Label("Check for updates", systemImage: "arrow.down.circle")
                         }
+                        .help("Open the latest GitBird release in your browser")
+                        Text("Updates are downloaded manually from GitHub. Checking the latest release requires an internet connection.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                         Link(destination: issuesURL) {
                             Label("Report an issue", systemImage: "exclamationmark.bubble")
                         }

@@ -16,7 +16,7 @@ A native macOS menu bar app for keeping GitHub and GitLab notifications close at
 - Hide read notifications by default, using server-side provider state.
 - Mark individual items or the entire list as read/done on the provider.
 - Native macOS menu bar experience with Liquid Glass styling on supported systems.
-- Local search by title, repository, or notification reason (⌘F).
+- Local search by title, repository, or notification reason (⌘F), plus mention, review-request, and repository filters.
 - Refresh (⌘R), Settings (⌘,), and explicit bulk-action scope confirmation.
 - Optional launch at login under General settings.
 - Optional App Store support tip and development/feedback links.
@@ -24,7 +24,7 @@ A native macOS menu bar app for keeping GitHub and GitLab notifications close at
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.7](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.7).
+See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.8](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.8).
 
 ## Requirements
 
@@ -34,7 +34,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release 
 
 ## Install
 
-Download [GitBird 2.1.7](https://github.com/h3pdesign/GitBird/releases/download/v2.1.7/GitBird-2.1.7.zip), unzip it, move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon. The universal download supports Apple Silicon and Intel, is Developer ID signed, notarized, and stapled, and requires macOS 14.6+. Check the archive against [SHA256SUMS.txt](https://github.com/h3pdesign/GitBird/releases/download/v2.1.7/SHA256SUMS.txt).
+Download [GitBird 2.1.8](https://github.com/h3pdesign/GitBird/releases/download/v2.1.8/GitBird-2.1.8.zip), unzip it, move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon. The universal download supports Apple Silicon and Intel, is Developer ID signed, notarized, and stapled, and requires macOS 14.6+. Check the archive against [SHA256SUMS.txt](https://github.com/h3pdesign/GitBird/releases/download/v2.1.8/SHA256SUMS.txt).
 
 ## Configure GitHub
 
@@ -59,9 +59,15 @@ GitLab notifications are represented by the GitLab Todo API. Pending Todos are s
 
 The provider is the source of truth. GitBird does not maintain a separate local read database. When **Hide read notifications** is enabled, GitBird requests only items the provider still considers unread or pending. When it is disabled, read/completed items that still exist on the provider are eligible to appear.
 
-Use the green check action to mark an item read. Use Delete or the done action to complete it. The refresh button reloads the current provider state. Bulk actions require confirmation: GitHub read applies to account notifications up to the last refresh time, GitHub done completes the loaded items (including search-hidden items), and both GitLab actions complete every pending Todo, including unloaded items.
+Use **Mark as read** to mark an item read. Use Delete or the done action to complete it. The refresh button reloads the current provider state. Bulk actions require confirmation: GitHub read applies to account notifications up to the last refresh time, GitHub done completes the loaded items (including search-hidden items), and GitLab completion covers every pending Todo, including unloaded items.
 
 GitBird 2.1.7 keeps bulk confirmation inside the notification popup. Choose **Confirm** (GitHub) or **Complete all Todos** (GitLab), or press Return, to run the action. Choose **Cancel** or press Escape to return without changes. Failed requests retain the items and show provider guidance; successful requests update the list and clear earlier action errors.
+
+GitBird 2.1.8 keeps previously loaded items visible below an error notice and exposes read/completion actions without hovering. GitLab has one Todo completion control; notifications without a browser detail URL can still be read or completed. The first fetch shows a checking state, and refresh waits for active notification actions to finish.
+
+GitHub offers All loaded, Mentions, and Review requested filters. Both providers support a repository filter. These combine with text search, stay local, and show the matching count within the loaded scope. Filters reset when changing accounts; bulk actions retain their explicitly confirmed scope, including search/filter-hidden items.
+
+Each active row shows progress and disables its mutation controls while keeping browser opening available. Freshness stays visible separately from success feedback, which clears after five seconds. About → **Check for updates** opens the latest GitHub release in your browser; downloads remain manual.
 
 Search filters only loaded notifications; **Load more** remains available. The menu bar count is the loaded unread count, with `+` when more pages exist. It is not a provider-wide total. Successful polling respects the selected interval; failures back off and provider retry/polling headers set a minimum wait.
 
