@@ -468,7 +468,7 @@ final class ReliabilityTests: XCTestCase {
             await eventually { data.lastPull != nil }
             data.notifications = [try Self.thread(provider: provider)]
             data.errorMessage = "The last refresh failed."
-            let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true))
+            let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
             let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = host
@@ -529,7 +529,7 @@ final class ReliabilityTests: XCTestCase {
         await data.loadCredentials()
         await eventually { data.errorMessage.contains("rate limiting") }
         data.notifications = [try Self.thread()]
-        let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true))
+        let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
         let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
@@ -558,7 +558,7 @@ final class ReliabilityTests: XCTestCase {
         await eventually { data.lastPull != nil }
         data.notifications = [try Self.thread()]
         data.errorMessage = "An earlier refresh failed."
-        let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true))
+        let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
         let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
@@ -599,7 +599,7 @@ final class ReliabilityTests: XCTestCase {
                 data.notifications = [try Self.thread(provider: provider)]
                 // Hosted tests need accessibility enabled explicitly when the
                 // runner has no assistive client to activate SwiftUI's tree.
-                let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true))
+                let host = NSHostingView(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
                 let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled, .closable], backing: .buffered, defer: false)
                 window.isReleasedWhenClosed = false
                 NSApp.activate()
@@ -697,6 +697,12 @@ final class ReliabilityTests: XCTestCase {
     }
 
     private func accessibilityTreeDescription(roots: [Any]) -> String {
+        func viewFrames(_ view: NSView, depth: Int) -> String {
+            guard depth < 10 else { return "" }
+            return "\(type(of: view)) frame=\(view.frame) bounds=\(view.bounds) hidden=\(view.isHidden)\n"
+                + view.subviews.map { viewFrames($0, depth: depth + 1) }.joined()
+        }
+        let layout = roots.compactMap { $0 as? NSView }.map { viewFrames($0, depth: 0) }.joined()
         var visited = Set<ObjectIdentifier>()
         func describe(_ node: Any, depth: Int) -> String {
             guard depth < 12, let element = node as? NSObject,
@@ -711,7 +717,7 @@ final class ReliabilityTests: XCTestCase {
                 .flatMap { attribute($0) as? [Any] ?? [] }
             return "\(type(of: element)) \(attributes)\n" + children.map { describe($0, depth: depth + 1) }.joined()
         }
-        return String(roots.map { describe($0, depth: 0) }.joined().prefix(6000))
+        return String((layout + roots.map { describe($0, depth: 0) }.joined()).prefix(12000))
     }
 
     func testGitLabBulkFailuresPreserveHTTPGuidanceAndRateLimits() async throws {
