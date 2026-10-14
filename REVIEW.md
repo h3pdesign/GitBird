@@ -102,7 +102,7 @@ The backend/API, credential storage, polling policy, App Store purchase logic, m
 
 The design direction follows Apple's guidance to keep feedback in context and expose clear actions: [Feedback](https://developer.apple.com/design/human-interface-guidelines/feedback), [Buttons](https://developer.apple.com/design/human-interface-guidelines/buttons), and [The menu bar](https://developer.apple.com/design/human-interface-guidelines/the-menu-bar). The priorities below are product recommendations based on the reviewed code, not claims that Apple requires these particular features.
 
-### Further improvements, in priority order
+### Initial recommendations (implementation status follows below)
 
 | Priority | Improvement and reason | Small implementation path | Acceptance evidence |
 | --- | --- | --- | --- |
@@ -161,6 +161,17 @@ Clean runners passed the provider/model regressions and all five support tests, 
 
 The refresh button and recovery notice are now small production SwiftUI components with the same behavior and bindings. Native tests exercise those exact components and the existing notification row directly in test-owned windows. They verify cached-item mutations without a URL/hover, duplicate GitLab row actions, provider retry delays, and both refresh controls while bulk work is in flight. The GitLab single bulk-control assertion remains in the full ContentView harness. Full window/popover Confirm/Cancel and Return/Escape tests continue to exercise production ContentView.
 
-This changes the three new tests from full scroll-list integration to component-level control dispatch; it does not certify the actual scroll-list accessibility hierarchy. All 40 reliability/native-control tests pass locally (`/tmp/GitBird-218-components-results.xcresult`). A clean full-suite run is still required before publication. Real MenuBarExtra rendering, full scroll-list keyboard/VoiceOver traversal, and supported-Mac acceptance remain open.
+This changes the three new tests from full scroll-list integration to component-level control dispatch; it does not certify the actual scroll-list accessibility hierarchy. All 40 reliability/native-control tests pass locally (`/tmp/GitBird-218-components-results.xcresult`). The clean full-suite run subsequently passed, as recorded below. Real MenuBarExtra rendering, full scroll-list keyboard/VoiceOver traversal, and supported-Mac acceptance remain open.
 
 Failure evidence is retained in [the initial CI run](https://github.com/h3pdesign/GitBird/actions/runs/38592862494) and [the controller diagnostic run](https://github.com/h3pdesign/GitBird/actions/runs/38598282242), plus `/tmp/gitbird-218-ci-first.log` through `/tmp/gitbird-218-ci-ninth.log`. These failed runs are not counted as passes.
+
+
+## Published GitHub release — 2.1.8
+
+[GitBird v2.1.8](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.8), build 192, is published as the latest stable release (`draft=false`, `prerelease=false`). The annotated tag resolves to `b627ebd3d1d99c8e7d43141cb982fc763bd9d6f0`. [Release-source CI](https://github.com/h3pdesign/GitBird/actions/runs/38598973526) passed the optimized Release build and all **45 tests**, with zero failures and no excluded tests, on Xcode 26.6/macOS 26. The tests comprise 40 provider/reliability/native-control checks and five support-manager tests, including two distinct verified Xcode consumable transactions. Native row/recovery checks are component-level; full ContentView confirmation still runs in window/popover hosts with Return/Escape coverage.
+
+The [notarized release workflow](https://github.com/h3pdesign/GitBird/actions/runs/38599558458) completed Developer ID signing, archive/export, notarization, stapling, packaging, and publication. Independent verification of the completed public download passed SHA-256, strict signature checks across all architectures, stapled-ticket validation, and Gatekeeper (`accepted`, `Notarized Developer ID`). The app contains arm64 and x86_64, reports version 2.1.8/build 192/minimum macOS 14.6, and retains hardened runtime plus App Sandbox/network-client entitlements. Archive SHA-256: `8c688e359f4900dc2d08ad1b04c73d93fa37adcdc16c378e493bf19f06e65099`.
+
+Evidence: `/tmp/gitbird-218-ci-success.log`, `/tmp/gitbird-218-notarized-release.log`, `/tmp/gitbird-218-published-verification.log`, and `/tmp/GitBird-218-published/`. The initial local full-run StoreKit failure remains recorded above; remote Xcode testing does not establish App Store product provisioning or signed App Store purchase acceptance.
+
+The remaining priorities are external acceptance: validate the actual signed popup and complete scroll-list keyboard/VoiceOver navigation on supported Macs, test read/done with disposable live GitHub/GitLab items, and authenticate App Store Connect to provision and validate the optional consumable in a signed sandbox/TestFlight build. All code improvements from the initial roadmap are implemented; these runtime/account checks remain unverified.
