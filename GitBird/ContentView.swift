@@ -209,15 +209,7 @@ struct ContentView: View {
 
     private var headerControlButtons: some View {
         HStack(spacing: 8) {
-            Button {
-                runtimeData.refreshNotifications()
-            } label: {
-                Image(systemName: "arrow.clockwise").frame(width: 24, height: 24)
-            }
-            .disabled(runtimeData.isRefreshing || runtimeData.isPerformingAnyAction)
-            .accessibilityLabel("Refresh notifications")
-            .help("Refresh (⌘R)")
-            .keyboardShortcut("r")
+            RefreshNotificationsButton()
 
             Button {
                 openURL(runtimeData.providerNotificationsURL)
@@ -429,7 +421,37 @@ struct ContentView: View {
         }
     }
 
-    private var errorNotice: some View {
+    private var errorNotice: some View { NotificationErrorNotice() }
+
+    @MainActor
+    private func closeMenuWindowIfPossible() {
+        // MenuBarExtra(.window) windows may not support performClose, which can trigger a system beep.
+        dismiss()
+        NSApp.keyWindow?.orderOut(nil)
+    }
+}
+
+struct RefreshNotificationsButton: View {
+    @EnvironmentObject private var runtimeData: RuntimeData
+    var body: some View {
+        Button {
+            runtimeData.refreshNotifications()
+        } label: {
+            Image(systemName: "arrow.clockwise").frame(width: 24, height: 24)
+        }
+        .disabled(runtimeData.isRefreshing || runtimeData.isPerformingAnyAction)
+        .accessibilityLabel("Refresh notifications")
+        .help("Refresh (⌘R)")
+        .keyboardShortcut("r")
+    }
+}
+
+struct NotificationErrorNotice: View {
+    @EnvironmentObject private var runtimeData: RuntimeData
+    @Environment(\.openSettings) private var openSettings
+    @AppStorage("settingsSection") private var settingsSection = "general"
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle")
@@ -458,13 +480,6 @@ struct ContentView: View {
             .controlSize(.small)
         }
         .accessibilityIdentifier("notificationError")
-    }
-
-    @MainActor
-    private func closeMenuWindowIfPossible() {
-        // MenuBarExtra(.window) windows may not support performClose, which can trigger a system beep.
-        dismiss()
-        NSApp.keyWindow?.orderOut(nil)
     }
 }
 

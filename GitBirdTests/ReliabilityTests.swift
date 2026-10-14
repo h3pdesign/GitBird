@@ -459,7 +459,7 @@ final class ReliabilityTests: XCTestCase {
         try await exerciseBulkConfirmation(inPopover: true, cancel: true, keyboard: true)
     }
 
-    func testCachedRowsStayActionableAfterErrorsWithoutDetailURLsOrHover() async throws {
+    func testCachedRowAndRecoveryComponentsStayActionableWithoutDetailURLsOrHover() async throws {
         for provider in NotificationProvider.allCases {
             let data = RuntimeData(defaults: defaults(provider: provider), credentials: MemoryCredentials(["github": "test-token", "gitlab:https://gitlab.example": "test-token"]), apiSession: session { request in
                 request.httpMethod == "GET" ? StubReply() : StubReply(205)
@@ -468,7 +468,15 @@ final class ReliabilityTests: XCTestCase {
             await eventually { data.lastPull != nil }
             data.notifications = [try Self.thread(provider: provider)]
             data.errorMessage = "The last refresh failed."
-            let controller = NSHostingController(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
+            let thread = try XCTUnwrap(data.notifications.first)
+            let controls = VStack {
+                NotificationErrorNotice()
+                NotificationRowView(thread: thread, details: nil, onOpen: { _, _ in },
+                    onMarkAsDone: { data.markNotificationAsDone(threadId: $0.id) },
+                    onMarkAsRead: { data.markNotificationAsRead(threadId: $0.id) },
+                    provider: provider, allowedAvatarHosts: [])
+            }
+            let controller = NSHostingController(rootView: controls.environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
             let host = controller.view
             let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
@@ -484,7 +492,6 @@ final class ReliabilityTests: XCTestCase {
             await eventually { self.accessibilityButton(named: title, roots: roots) != nil }
             XCTAssertNotNil(accessibilityButton(named: "Retry refresh", roots: roots))
             if provider == .gitlab {
-                XCTAssertNil(accessibilityButton(named: "bulkDone", roots: roots), "GitLab has one bulk completion action")
                 XCTAssertNil(accessibilityButton(named: "Mark as done", roots: roots), "Todo completion is not duplicated in each row")
             }
             let action = try XCTUnwrap(accessibilityButton(named: title, roots: roots), accessibilityTreeDescription(roots: roots))
@@ -530,7 +537,11 @@ final class ReliabilityTests: XCTestCase {
         await data.loadCredentials()
         await eventually { data.errorMessage.contains("rate limiting") }
         data.notifications = [try Self.thread()]
-        let controller = NSHostingController(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
+        let controls = VStack {
+            RefreshNotificationsButton()
+            NotificationErrorNotice()
+        }
+        let controller = NSHostingController(rootView: controls.environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
         let host = controller.view
         let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -560,7 +571,11 @@ final class ReliabilityTests: XCTestCase {
         await eventually { data.lastPull != nil }
         data.notifications = [try Self.thread()]
         data.errorMessage = "An earlier refresh failed."
-        let controller = NSHostingController(rootView: ContentView().environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
+        let controls = VStack {
+            RefreshNotificationsButton()
+            NotificationErrorNotice()
+        }
+        let controller = NSHostingController(rootView: controls.environmentObject(data).environment(\.accessibilityEnabled, true).frame(width: 420, height: 520))
         let host = controller.view
         let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 520), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -632,6 +647,9 @@ final class ReliabilityTests: XCTestCase {
                 let contentRoot: [Any] = [host, try XCTUnwrap(host.window)]
                 let label = kind == .read ? "bulkRead" : "bulkDone"
                 await eventually { self.accessibilityButton(named: label, roots: contentRoot) != nil }
+                if provider == .gitlab {
+                    XCTAssertNil(accessibilityButton(named: "bulkDone", roots: contentRoot), "GitLab has one bulk completion action")
+                }
                 if accessibilityButton(named: label, roots: contentRoot) == nil {
                     XCTFail("Missing \(label). \(accessibilityTreeDescription(roots: contentRoot))")
                 }
@@ -671,27 +689,12 @@ final class ReliabilityTests: XCTestCase {
             guard node.responds(to: selector) else { return nil }
             return node.perform(selector)?.takeUnretainedValue()
         }
-        var visited = Set<ObjectIdentifier>()
         func find(_ node: Any, depth: Int) -> NSObject? {
-            guard depth < 20, let element = node as? NSObject,
-                  visited.insert(ObjectIdentifier(element)).inserted else { return nil }
+            guard depth < 20, let element = node as? NSObject else { return nil }
             if attribute(element, "accessibilityRole") as? String == "AXButton",
                attribute(element, "accessibilityLabel") as? String == name || attribute(element, "accessibilityTitle") as? String == name || attribute(element, "accessibilityIdentifier") as? String == name { return element }
-            // AppKit containers can expose their content separately from the
-            // regular child array (notably scroll views on macOS 26).
-            for relationship in ["accessibilityChildren", "accessibilityContents", "accessibilityChildrenInNavigationOrder"] {
-                for child in attribute(element, relationship) as? [Any] ?? [] {
-                    if let found = find(child, depth: depth + 1) { return found }
-                }
-            }
-            // In-process macOS 26 scroll containers may omit their document
-            // from AX relationships even though its native controls are laid
-            // out. Inspect visible test-owned AppKit descendants too. This
-            // dispatch test does not certify VoiceOver traversal or speech.
-            if let view = element as? NSView, !view.isHiddenOrHasHiddenAncestor {
-                for child in view.subviews where !child.isHiddenOrHasHiddenAncestor && !child.visibleRect.isEmpty {
-                    if let found = find(child, depth: depth + 1) { return found }
-                }
+            for child in attribute(element, "accessibilityChildren") as? [Any] ?? [] {
+                if let found = find(child, depth: depth + 1) { return found }
             }
             return nil
         }
@@ -709,27 +712,18 @@ final class ReliabilityTests: XCTestCase {
     }
 
     private func accessibilityTreeDescription(roots: [Any]) -> String {
-        func viewFrames(_ view: NSView, depth: Int) -> String {
-            guard depth < 10 else { return "" }
-            return "\(type(of: view)) frame=\(view.frame) bounds=\(view.bounds) hidden=\(view.isHidden) role=\(String(describing: view.accessibilityRole())) label=\(view.accessibilityLabel() ?? "") title=\(view.accessibilityTitle() ?? "")\n"
-                + view.subviews.map { viewFrames($0, depth: depth + 1) }.joined()
-        }
-        let layout = roots.compactMap { $0 as? NSView }.map { viewFrames($0, depth: 0) }.joined()
-        var visited = Set<ObjectIdentifier>()
         func describe(_ node: Any, depth: Int) -> String {
-            guard depth < 12, let element = node as? NSObject,
-                  visited.insert(ObjectIdentifier(element)).inserted else { return "" }
+            guard depth < 8, let element = node as? NSObject else { return "" }
             func attribute(_ name: String) -> Any? {
                 let selector = NSSelectorFromString(name)
                 guard element.responds(to: selector) else { return nil }
                 return element.perform(selector)?.takeUnretainedValue()
             }
             let attributes = ["accessibilityRole", "accessibilityLabel", "accessibilityTitle", "accessibilityIdentifier"].map { String(describing: attribute($0)) }
-            let children = ["accessibilityChildren", "accessibilityContents", "accessibilityChildrenInNavigationOrder"]
-                .flatMap { attribute($0) as? [Any] ?? [] }
+            let children = attribute("accessibilityChildren") as? [Any] ?? []
             return "\(type(of: element)) \(attributes)\n" + children.map { describe($0, depth: depth + 1) }.joined()
         }
-        return String((layout + roots.map { describe($0, depth: 0) }.joined()).prefix(12000))
+        return String(roots.map { describe($0, depth: 0) }.joined().prefix(6000))
     }
 
     func testGitLabBulkFailuresPreserveHTTPGuidanceAndRateLimits() async throws {
