@@ -13,6 +13,7 @@ struct ContentView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityEnabled) private var accessibilityEnabled
 
     @AppStorage("settingsSection") private var settingsSection = "general"
     @State private var searchText = ""
@@ -426,6 +427,9 @@ struct ContentView: View {
                 .padding(.vertical, 2)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Loaded notifications")
+                // Preserve the host's accessibility state across the native
+                // scroll-document boundary on older supported macOS releases.
+                .environment(\.accessibilityEnabled, accessibilityEnabled)
             }
             .frame(minHeight: 140, maxHeight: .infinity)
         }
