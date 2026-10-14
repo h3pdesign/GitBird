@@ -424,6 +424,8 @@ struct ContentView: View {
                     }
                 }
                 .padding(.vertical, 2)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Loaded notifications")
             }
             .frame(minHeight: 140, maxHeight: .infinity)
         }
