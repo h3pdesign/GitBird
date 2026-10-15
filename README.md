@@ -24,7 +24,7 @@ A native macOS menu bar app for keeping GitHub and GitLab notifications close at
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.8](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.8).
+See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.9](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.9).
 
 ## Requirements
 
@@ -34,7 +34,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release 
 
 ## Install
 
-Download [GitBird 2.1.8](https://github.com/h3pdesign/GitBird/releases/download/v2.1.8/GitBird-2.1.8.zip), unzip it, move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon. The universal download supports Apple Silicon and Intel, is Developer ID signed, notarized, and stapled, and requires macOS 14.6+. Check the archive against [SHA256SUMS.txt](https://github.com/h3pdesign/GitBird/releases/download/v2.1.8/SHA256SUMS.txt).
+Download [GitBird 2.1.9](https://github.com/h3pdesign/GitBird/releases/download/v2.1.9/GitBird-2.1.9.zip), unzip it, move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon. The universal download supports Apple Silicon and Intel, is Developer ID signed, notarized, and stapled, and requires macOS 14.6+. Check the archive against [SHA256SUMS.txt](https://github.com/h3pdesign/GitBird/releases/download/v2.1.9/SHA256SUMS.txt).
 
 ## Configure GitHub
 
@@ -70,6 +70,8 @@ GitHub offers All loaded, Mentions, and Review requested filters. Both providers
 Each active row shows progress and disables its mutation controls while keeping browser opening available. Freshness stays visible separately from success feedback, which clears after five seconds. About → **Check for updates** opens the latest GitHub release in your browser; downloads remain manual.
 
 Search filters only loaded notifications; **Load more** remains available. The menu bar count is the loaded unread count, with `+` when more pages exist. It is not a provider-wide total. Successful polling respects the selected interval; failures back off and provider retry/polling headers set a minimum wait.
+
+GitBird 2.1.9 compiles the layered Icon Composer artwork as the primary app icon and retains system-generated compatibility icons. App Store Connect thumbnail appearance still requires verification after uploading an App Store build.
 
 ## Build from source
 
