@@ -175,3 +175,12 @@ The [notarized release workflow](https://github.com/h3pdesign/GitBird/actions/ru
 Evidence: `/tmp/gitbird-218-ci-success.log`, `/tmp/gitbird-218-notarized-release.log`, `/tmp/gitbird-218-published-verification.log`, and `/tmp/GitBird-218-published/`. The initial local full-run StoreKit failure remains recorded above; remote Xcode testing does not establish App Store product provisioning or signed App Store purchase acceptance.
 
 The remaining priorities are external acceptance: validate the actual signed popup and complete scroll-list keyboard/VoiceOver navigation on supported Macs, test read/done with disposable live GitHub/GitLab items, and authenticate App Store Connect to provision and validate the optional consumable in a signed sandbox/TestFlight build. All code improvements from the initial roadmap are implemented; these runtime/account checks remain unverified.
+
+
+## Icon integration correction — 2026-10-15
+
+The screenshot investigation found that the selected legacy 1024-pixel PNG has an 824-pixel visible tile. `AppIcon.icon` was incorrectly assigned to Frameworks, so the 2.1.8 release compiled only the legacy PNG icon catalog. Move the Composer file into the app's Resources phase and rename the retained PNG set to `AppIconLegacy.appiconset` to remove the primary-name conflict. The existing vector artwork and light/dark configuration remain the icon source.
+
+Verification: an optimized universal Release build passed with Xcode 27, minimum macOS 14.6, and shipping sandbox/hardened-runtime settings retained. The actual asset-compiler command now includes `AppIcon.icon`. The compiled catalog contains Aqua/Dark Aqua/tintable IconImageStack variants, vector layers, a 1024-pixel rendition, and generated compatibility images; the legacy catalog is not selected or included. Native AppKit rendering confirms the new artwork. The older-system compatibility icon retains conventional 824/1024 tile bounds, so its Dock rendering is not a test of the App Store thumbnail.
+
+App Store Connect thumbnail appearance remains unverified until a corrected build is uploaded and Apple's selected rendition is checked. No App Store upload or release publication was performed for this correction. Evidence: `/tmp/gitbird-icon-fix-20261015-build.log`, `/tmp/gitbird-icon-fix-20261015-assets.json`, and `/tmp/gitbird-icon-after-20261015.png`.

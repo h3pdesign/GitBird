@@ -4,6 +4,10 @@ All notable changes to GitBird are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Compile the Icon Composer app icon as a target resource and separate the legacy PNG icon set so Xcode uses the layered artwork instead of the legacy PNG icon.
+
 ## [2.1.8] - 2026-10-14
 
 ### Added

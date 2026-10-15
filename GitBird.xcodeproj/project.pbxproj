@@ -16,7 +16,7 @@
 		54A0D0032D0F000100000001 /* NotificationRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0022D0F000100000001 /* NotificationRowView.swift */; };
 		54A0D0072D0F000100000001 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0062D0F000100000001 /* VisualEffectView.swift */; };
 		54A0D00A2D0F000100000001 /* AppLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0082D0F000100000001 /* AppLog.swift */; };
-		54A0D00C2D0F000100000001 /* AppIcon.icon in Frameworks */ = {isa = PBXBuildFile; fileRef = 54A0D00B2D0F000100000001 /* AppIcon.icon */; };
+		54A0D00C2D0F000100000001 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 54A0D00B2D0F000100000001 /* AppIcon.icon */; };
 		A73F10203040506070809001 /* SupportPurchaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73F10203040506070809002 /* SupportPurchaseManager.swift */; };
 		A73F10203040506070809004 /* SupportPurchaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73F10203040506070809005 /* SupportPurchaseManagerTests.swift */; };
 		A73F10203040506070809006 /* SupportOptional.storekit in Resources */ = {isa = PBXBuildFile; fileRef = A73F10203040506070809003 /* SupportOptional.storekit */; };
@@ -58,7 +58,6 @@
 		5426125E2ACFB17E00682CA7 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
-				54A0D00C2D0F000100000001 /* AppIcon.icon in Frameworks */,
 			);
 		};
 		A73F10203040506070809013 /* Frameworks */ = {
@@ -201,6 +200,7 @@
 			files = (
 				5426126C2ACFB17F00682CA7 /* Preview Assets.xcassets in Resources */,
 				542612692ACFB17F00682CA7 /* Assets.xcassets in Resources */,
+				54A0D00C2D0F000100000001 /* AppIcon.icon in Resources */,
 			);
 		};
 		A73F10203040506070809012 /* Resources */ = {
