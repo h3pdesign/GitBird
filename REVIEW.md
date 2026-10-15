@@ -184,3 +184,14 @@ The screenshot investigation found that the selected legacy 1024-pixel PNG has a
 Verification: an optimized universal Release build passed with Xcode 27, minimum macOS 14.6, and shipping sandbox/hardened-runtime settings retained. The actual asset-compiler command now includes `AppIcon.icon`. The compiled catalog contains Aqua/Dark Aqua/tintable IconImageStack variants, vector layers, a 1024-pixel rendition, and generated compatibility images; the legacy catalog is not selected or included. Native AppKit rendering confirms the new artwork. The older-system compatibility icon retains conventional 824/1024 tile bounds, so its Dock rendering is not a test of the App Store thumbnail.
 
 App Store Connect thumbnail appearance remains unverified until a corrected build is uploaded and Apple's selected rendition is checked. No App Store upload or release publication was performed for this correction. Evidence: `/tmp/gitbird-icon-fix-20261015-build.log`, `/tmp/gitbird-icon-fix-20261015-assets.json`, and `/tmp/gitbird-icon-after-20261015.png`.
+
+
+## Published GitHub release — 2.1.9 (2026-10-15)
+
+[GitBird v2.1.9](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.9), build 193, is published as the latest stable release (`draft=false`, `prerelease=false`). The tag resolves to `d5906c6716af3dfe57ba746a24aadbf66beca123`. [Release-source CI](https://github.com/h3pdesign/GitBird/actions/runs/38759085852) passed the optimized Release build and all 45 tests on Xcode 26.6/macOS 26, with zero failures and no exclusions.
+
+The [release workflow](https://github.com/h3pdesign/GitBird/actions/runs/38760183869) completed Developer ID signing, archive/export, Apple notarization, stapling, and publication of `GitBird-2.1.9.zip` and `SHA256SUMS.txt`. Independent verification of the completed public download passed SHA-256, strict signature verification across all architectures, stapled-ticket validation, and Gatekeeper (`accepted`, `Notarized Developer ID`). The app reports version 2.1.9/build 193/minimum macOS 14.6, contains arm64 and x86_64, and retains hardened runtime plus App Sandbox/network-client entitlements. Archive SHA-256: `67d3cfb7ecd1b0fe9b0c8c85830c4accca365a10c5a44b70b0dd3cc8a37b56bf`.
+
+The published asset catalog contains the primary Icon Composer image stack in Aqua, Dark Aqua, and tintable appearances; the unused legacy PNG catalog is excluded. This confirms the corrected icon integration is present in the signed download. App Store Connect thumbnail sizing still requires an App Store build upload and inspection of Apple's selected rendition. Live App Store purchase provisioning and real popup/VoiceOver/live-account acceptance remain separate checks.
+
+Evidence: `/tmp/gitbird-219-ci-success.log`, `/tmp/gitbird-219-notarized-release.log`, `/tmp/gitbird-219-published-verification.log`, `/tmp/gitbird-219-published-assets.json`, and `/tmp/GitBird-219-published/`.
