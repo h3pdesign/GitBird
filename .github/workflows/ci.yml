@@ -17,7 +17,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Select Xcode
         run: |
           set -euo pipefail
@@ -40,7 +40,7 @@ jobs:
             CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= ENABLE_HARDENED_RUNTIME=NO ENABLE_APP_SANDBOX=NO test
       - name: Preserve test evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: GitBird-test-results
           path: ${{ runner.temp }}/GitBird-tests.xcresult
