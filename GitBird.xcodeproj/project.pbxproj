@@ -16,7 +16,6 @@
 		54A0D0032D0F000100000001 /* NotificationRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0022D0F000100000001 /* NotificationRowView.swift */; };
 		54A0D0072D0F000100000001 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0062D0F000100000001 /* VisualEffectView.swift */; };
 		54A0D00A2D0F000100000001 /* AppLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A0D0082D0F000100000001 /* AppLog.swift */; };
-		54A0D00C2D0F000100000001 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 54A0D00B2D0F000100000001 /* AppIcon.icon */; };
 		A73F10203040506070809001 /* SupportPurchaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73F10203040506070809002 /* SupportPurchaseManager.swift */; };
 		A73F10203040506070809004 /* SupportPurchaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73F10203040506070809005 /* SupportPurchaseManagerTests.swift */; };
 		A73F10203040506070809006 /* SupportOptional.storekit in Resources */ = {isa = PBXBuildFile; fileRef = A73F10203040506070809003 /* SupportOptional.storekit */; };
@@ -200,7 +199,6 @@
 			files = (
 				5426126C2ACFB17F00682CA7 /* Preview Assets.xcassets in Resources */,
 				542612692ACFB17F00682CA7 /* Assets.xcassets in Resources */,
-				54A0D00C2D0F000100000001 /* AppIcon.icon in Resources */,
 			);
 		};
 		A73F10203040506070809012 /* Resources */ = {
@@ -376,7 +374,7 @@
 				CODE_SIGN_ENTITLEMENTS = GitBird/GitBird.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 193;
+				CURRENT_PROJECT_VERSION = 194;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"GitBird/Preview Content\"";
 				DEVELOPMENT_TEAM = CS727NF72U;
@@ -386,7 +384,6 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				ICON_FILE = AppIcon.icon;
 				INFOPLIST_FILE = GitBird/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = GitBird;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -397,7 +394,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.1.9;
+				MARKETING_VERSION = 2.1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitBird;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -415,7 +412,7 @@
 				CODE_SIGN_ENTITLEMENTS = GitBird/GitBird.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 193;
+				CURRENT_PROJECT_VERSION = 194;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"GitBird/Preview Content\"";
 				DEVELOPMENT_TEAM = CS727NF72U;
@@ -425,7 +422,6 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				ICON_FILE = AppIcon.icon;
 				INFOPLIST_FILE = GitBird/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = GitBird;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -436,7 +432,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.1.9;
+				MARKETING_VERSION = 2.1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.h3p.GitBird;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

@@ -4,6 +4,12 @@ All notable changes to GitBird are documented here.
 
 ## Unreleased
 
+## [2.1.10] - 2026-10-25
+
+### Fixed
+
+- Enlarge the app icon in Finder, the Dock, and store artwork by increasing the bird and branch artwork by 15% and using full-canvas rendered artwork without the extra macOS icon inset. Retain the editable Icon Composer source.
+
 ## [2.1.9] - 2026-10-15
 
 ### Fixed

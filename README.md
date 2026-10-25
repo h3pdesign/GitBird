@@ -24,7 +24,7 @@ A native macOS menu bar app for keeping GitHub and GitLab notifications close at
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.9](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.9).
+See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release is [GitBird 2.1.10](https://github.com/h3pdesign/GitBird/releases/tag/v2.1.10).
 
 ## Requirements
 
@@ -34,7 +34,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for the release history. The current release 
 
 ## Install
 
-Download [GitBird 2.1.9](https://github.com/h3pdesign/GitBird/releases/download/v2.1.9/GitBird-2.1.9.zip), unzip it, move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon. The universal download supports Apple Silicon and Intel, is Developer ID signed, notarized, and stapled, and requires macOS 14.6+. Check the archive against [SHA256SUMS.txt](https://github.com/h3pdesign/GitBird/releases/download/v2.1.9/SHA256SUMS.txt).
+Download [GitBird 2.1.10](https://github.com/h3pdesign/GitBird/releases/download/v2.1.10/GitBird-2.1.10.zip), unzip it, move GitBird to `/Applications`, and launch it. GitBird is a menu bar app, so its main window appears from the menu bar icon. The universal download supports Apple Silicon and Intel, is Developer ID signed, notarized, and stapled, and requires macOS 14.6+. Check the archive against [SHA256SUMS.txt](https://github.com/h3pdesign/GitBird/releases/download/v2.1.10/SHA256SUMS.txt).
 
 ## Configure GitHub
 
@@ -71,7 +71,7 @@ Each active row shows progress and disables its mutation controls while keeping 
 
 Search filters only loaded notifications; **Load more** remains available. The menu bar count is the loaded unread count, with `+` when more pages exist. It is not a provider-wide total. Successful polling respects the selected interval; failures back off and provider retry/polling headers set a minimum wait.
 
-GitBird 2.1.9 compiles the layered Icon Composer artwork as the primary app icon and retains system-generated compatibility icons. App Store Connect thumbnail appearance still requires verification after uploading an App Store build.
+GitBird 2.1.10 enlarges the bird and branch artwork by 15% and uses full-canvas rendered app icons at every macOS resolution so the artwork is larger in Finder, the Dock, and store imagery. The editable Icon Composer source remains in `GitBird/AppIcon.icon`; it is excluded from target resources to prevent Xcode from regenerating inset compatibility icons. App Store Connect thumbnail appearance still requires verification after uploading an App Store build.
 
 ## Build from source
 

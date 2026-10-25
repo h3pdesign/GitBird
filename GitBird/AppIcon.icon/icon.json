@@ -19,10 +19,10 @@
           "image-name" : "gitbird-bird-symbol-red.svg",
           "name" : "gitbird-bird-symbol-red",
           "position" : {
-            "scale" : 1.8,
+            "scale" : 2.07,
             "translation-in-points" : [
-              28.518961559809327,
-              -79
+              32.796806,
+              -90.85
             ]
           }
         },
@@ -41,10 +41,10 @@
           "image-name" : "gitbird-git-symbol-red.svg",
           "name" : "gitbird-git-symbol-red",
           "position" : {
-            "scale" : 1.5,
+            "scale" : 1.725,
             "translation-in-points" : [
-              0,
-              131.3984375
+              0.0,
+              151.108203
             ]
           }
         }
@@ -72,10 +72,10 @@
           "image-name" : "gitbird-git-symbol 2.svg",
           "name" : "gitbird-git-symbol 2",
           "position" : {
-            "scale" : 1.5,
+            "scale" : 1.725,
             "translation-in-points" : [
-              0,
-              131.3984375
+              0.0,
+              151.108203
             ]
           }
         },
@@ -84,10 +84,10 @@
           "image-name" : "gitbird-bird-symbol 2.svg",
           "name" : "gitbird-bird-symbol 2",
           "position" : {
-            "scale" : 1.5,
+            "scale" : 1.725,
             "translation-in-points" : [
-              28.518961559809327,
-              -79
+              32.796806,
+              -90.85
             ]
           }
         }
